@@ -1,10 +1,20 @@
 # Osiris Compute
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/live%20demo-compute.osirisindustries.net-orange)](https://compute.osirisindustries.net)
+[![Runtime deps](https://img.shields.io/badge/runtime%20deps-1%20(ws)-success)](package.json)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 **A browser-based, peer-to-peer public compute utility. No install. No cryptocurrency. No data center.**
 
 Osiris Compute lets people pool the spare compute of their own devices and trusted peers into a **private circle** — straight from the browser. It is a modern, web-era successor to volunteer-computing projects like BOINC and SETI@home, built for one stubborn belief: **useful computation should not have to live inside a hyperscaler's data center.**
 
-Live grid: **https://compute.osirisindustries.net**  ·  Source: **https://github.com/osiris-industries/osiris-compute**
+▶ **Try the live grid:** **https://compute.osirisindustries.net** (desktop Chrome/Edge, open it in two tabs)  ·  Source: **https://github.com/osiris-industries/osiris-compute**
+
+<!-- DEMO: drop a short screen-recording GIF here once captured, e.g.
+![Osiris Compute: a 7B model streaming across a circle of browsers](docs/demo.gif)
+A ~20s clip of two tabs (or a phone + laptop on one wifi) streaming tokens is the
+single highest-impact thing to add to this README. -->
 
 ---
 
@@ -157,6 +167,14 @@ Model **shards** (the `.onnx` files) are large and served as static assets
 out-of-band — they live under `public/models/<id>/` at runtime but are **not** stored
 in git (see `.gitignore`). Use `fetch-demo-model.sh` to grab one, or build your own
 with the toolchain in `tools/`.
+
+---
+
+## Contributing & security
+
+Contributions of every size are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Found a security issue? Please report it privately per [SECURITY.md](SECURITY.md).
+Everyone participating is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
