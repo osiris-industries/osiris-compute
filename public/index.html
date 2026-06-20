@@ -1031,7 +1031,7 @@ self.onmessage = function(ev){
   function onCreated(m){
     role="host"; selfId=m.selfId; roomId=m.roomId;
     $("landing").classList.add("hidden"); $("hostView").classList.remove("hidden");
-    $("roomCode").textContent=m.roomId; $("shareLink").value="https://"+location.host+"/?room="+m.roomId;
+    $("roomCode").textContent=m.roomId; $("shareLink").value=location.origin+"/?room="+m.roomId;
     host.specs.set("self", deviceSpecs()); host.renderUsage();
     log($("hostLog"),"circle opened — code "+m.roomId); log($("hostLog"),"this device: "+specSummary(host.specs.get("self")));
     $("chat").classList.remove("hidden"); $("chatName").value=myName; renderPresence(host.rosterList());
