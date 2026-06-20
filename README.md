@@ -37,7 +37,26 @@ Osiris Compute can run a language model **too big for any single device** by spl
 - Each generated token, only a few **kilobytes of hidden-state** travel device → device — not the weights.
 - Placement is capability-aware: strong devices anchor, weak devices hold a slice.
 
-The live grid currently serves five models this way — from Qwen2.5-0.5B up to **Mistral-7B-Instruct split across a host + 6 interior shards**, with coherent generation across machines that could never each hold the whole model.
+The live grid currently serves several models this way — from Qwen2.5-0.5B up to **Mistral-7B-Instruct split across a host + 6 interior shards**, with coherent generation across machines that could never each hold the whole model.
+
+> **Status note:** the larger **Mistral-7B** distributed implementation is **under active testing** right now — multi-shard pipelines at that size are still being hardened, so expect rough edges on that specific model. The smaller models (Qwen2.5-0.5B / 1.5B, distilgpt2) are the stable, reliable demos.
+
+---
+
+## For reviewers (DigitalOcean Open Source team 👋)
+
+The fastest way to see it work — **no clone, no install:**
+
+1. Open **https://compute.osirisindustries.net** in **desktop Chrome or Edge** (WebGPU is required; Safari/Firefox and most mobile browsers won't run the inference path yet).
+2. Open the **same link in a second tab** (or on a second device) — that forms a two-peer circle. The signaling server even hands out a TURN relay, so peers on different networks can connect.
+3. Pick a model and run it. **Start with `Qwen2.5-0.5B` or `distilgpt2`** — they're small, so the shards load in seconds and you'll see tokens stream across the circle almost immediately. Larger models download more weight to the browser first, so give them a moment.
+
+A few honest expectations:
+- **WebGPU + Chrome/Edge desktop** is the supported path for the anchor device.
+- **First model load downloads its shards** to the browser, so there's a brief wait before the first token (smaller model = faster).
+- **Mistral-7B is mid-testing** (see the status note above) — for a clean first impression, use a small model.
+
+Happy to give a live walkthrough across a couple of your own devices — just reach out to **admin@osirisindustries.net**.
 
 ---
 
