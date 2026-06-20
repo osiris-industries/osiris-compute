@@ -1,0 +1,8 @@
+Osiris Compute
+Copyright (c) 2026 Osiris Industries
+
+Licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+
+Third-party components:
+- public/wabt.js — WebAssembly Binary Toolkit (WABT), Apache License 2.0,
+  https://github.com/WebAssembly/wabt . Vendored for in-browser WAT/WASM use.

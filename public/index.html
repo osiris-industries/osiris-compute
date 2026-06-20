@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Osiris Compute — Private Compute Circle</title>
+<meta name="description" content="Host or join a private compute circle and pool device power directly in the browser. Zero install, zero crypto, fully sandboxed.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --ink:#f1f1ef;--ink-soft:#cfcfca;--paper:#0b0b0c;--paper-2:#0f0f10;
+    --mute:#8a8a86;--rule:rgba(255,255,255,.10);--rule-strong:rgba(255,255,255,.55);
+    --ok:#7fd1a3;--warn:#e6c07b;--bad:#e08a8a;
+    --serif:"Fraunces","Times New Roman",serif;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:880px;margin:0 auto;padding:0 24px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;max-width:880px;margin:0 auto;padding:20px 24px;border-bottom:1px solid var(--rule);font-size:13px}
+  .topbar a{text-decoration:none;color:var(--ink)}
+  .topbar .tag{font-family:var(--mono);font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.1em}
+  h1{font-family:var(--serif);font-weight:400;font-size:40px;line-height:1.1;letter-spacing:-.02em;margin:48px 0 12px}
+  h1 em{font-style:italic;color:var(--ink-soft)}
+  .lede{color:var(--ink-soft);font-size:17px;max-width:600px;margin-bottom:36px}
+  .choose{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+  @media(max-width:640px){.choose{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--rule);border-radius:14px;padding:24px;background:var(--paper-2)}
+  .panel h2{font-family:var(--serif);font-weight:400;font-size:22px;margin-bottom:8px}
+  .panel p{color:var(--mute);font-size:14px;margin-bottom:18px}
+  .btn{font-family:var(--sans);font-size:14px;font-weight:600;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+       padding:11px 20px;border-radius:8px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block}
+  .btn:hover{background:transparent;color:var(--ink)}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+  .btn.ghost:hover{border-color:var(--rule-strong)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .field{display:flex;gap:10px}
+  input[type=text]{flex:1;font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;
+    background:var(--paper);border:1px solid var(--rule);color:var(--ink);border-radius:8px;padding:10px 14px;outline:none}
+  input[type=text]:focus{border-color:var(--rule-strong)}
+  .hidden{display:none!important}
+  .stage{border:1px solid var(--rule);border-radius:14px;padding:24px;background:var(--paper-2);margin-bottom:20px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  .code{font-family:var(--mono);font-size:30px;letter-spacing:.18em;color:var(--ink)}
+  .muted{color:var(--mute);font-size:13px}
+  .share{display:flex;gap:10px;margin-top:16px}
+  .share input{flex:1;font-family:var(--mono);font-size:12px;letter-spacing:0;text-transform:none}
+  .taskpick{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:12px;color:var(--ink-soft);background:transparent;border:1px solid var(--rule);
+        border-radius:100px;padding:6px 14px;cursor:pointer;transition:all .15s}
+  .chip:hover{border-color:var(--rule-strong)}
+  .chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+  @media(max-width:640px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+  .stat{border:1px solid var(--rule);border-radius:10px;padding:14px}
+  .stat .k{font-family:var(--mono);font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+  .stat .v{font-family:var(--serif);font-size:24px;margin-top:4px}
+  .bar{height:8px;background:rgba(255,255,255,.06);border-radius:6px;overflow:hidden;margin:10px 0 4px}
+  .bar > i{display:block;height:100%;width:0;background:var(--ink-soft);transition:width .2s}
+  canvas{width:100%;max-width:640px;border:1px solid var(--rule);border-radius:10px;display:block;margin-top:14px;background:#000;image-rendering:pixelated}
+  .log{font-family:var(--mono);font-size:12px;color:var(--mute);margin-top:16px;max-height:160px;overflow:auto;border-top:1px solid var(--rule);padding-top:12px}
+  .log div{padding:2px 0}
+  .pill{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--rule);border-radius:100px;padding:3px 10px;color:var(--ink-soft)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mute);margin-right:7px;vertical-align:middle}
+  .dot.on{background:var(--ok)}
+  .dot.bad{background:var(--bad)}
+  .dot.warn{background:var(--warn)}
+  .presence{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .who-pill{font-family:var(--mono);font-size:11px;color:var(--ink-soft);border:1px solid var(--rule);border-radius:100px;padding:3px 10px}
+  .chatlog{height:240px;overflow-y:auto;border:1px solid var(--rule);border-radius:10px;padding:12px;background:var(--paper);display:flex;flex-direction:column;gap:6px}
+  .msg{font-size:14px;max-width:80%;padding:6px 10px;border-radius:10px;background:var(--paper-2);border:1px solid var(--rule);align-self:flex-start;word-break:break-word}
+  .msg.mine{align-self:flex-end;background:var(--ink);color:var(--paper)}
+  .msg.sys{align-self:center;background:transparent;border:none;color:var(--mute);font-family:var(--mono);font-size:12px;padding:2px}
+  .msg .who{font-family:var(--mono);font-size:11px;color:var(--mute);display:block;margin-bottom:2px}
+  .msg.mine .who{color:rgba(11,11,12,.6)}
+  video{width:100%;max-width:640px;border:1px solid var(--rule);border-radius:10px;display:block;margin-top:10px;background:#000}
+  #scene{cursor:crosshair}
+  #hostView{display:flex;flex-direction:column}
+  #labStage{order:1}
+  #outStage{order:2}
+  #sceneStage{order:3}
+  .lab{display:grid;grid-template-columns:190px 1fr;gap:14px;margin-top:14px}
+  @media(max-width:640px){.lab{grid-template-columns:1fr}}
+  .filetree{border:1px solid var(--rule);border-radius:10px;padding:10px;background:var(--paper);min-height:320px}
+  .filetree .f{font-family:var(--mono);font-size:12px;padding:5px 8px;border-radius:6px;cursor:pointer;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .filetree .f:hover{background:var(--paper-2)}
+  .filetree .f.active{background:var(--ink);color:var(--paper)}
+  .editorpane{display:flex;flex-direction:column;min-width:0}
+  textarea#editor{width:100%;height:340px;font-family:var(--mono);font-size:13px;line-height:1.5;background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-radius:10px;padding:12px;resize:vertical;outline:none;white-space:pre;overflow:auto}
+  textarea#editor:focus{border-color:var(--rule-strong)}
+  footer{max-width:880px;margin:0 auto;padding:40px 24px;color:var(--mute);font-size:12px;border-top:1px solid var(--rule)}
+  footer a{color:var(--ink-soft)}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="https://osirisindustries.net/compute/">Osiris Compute</a>
+    <span class="tag">Private compute circle</span>
+  </div>
+
+  <div class="wrap">
+    <!-- LANDING -->
+    <section id="landing">
+      <h1>Pool your devices.<br><em>Privately.</em></h1>
+      <p class="lede">Host a circle and share the link, or join one you were invited to. Everything runs in this browser tab and computes directly between members — the server only introduces you.</p>
+      <div class="choose">
+        <div class="panel">
+          <h2>Host a circle</h2>
+          <p>Open a private room. You pick the job and who joins.</p>
+          <button class="btn" id="hostBtn">Host a compute circle</button>
+        </div>
+        <div class="panel">
+          <h2>Join a circle</h2>
+          <p>Enter the 6-character code a friend shared with you.</p>
+          <div class="field">
+            <input type="text" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false">
+            <button class="btn ghost" id="joinBtn">Join</button>
+          </div>
+        </div>
+      </div>
+      <p class="muted"><span class="dot" id="connDot"></span><span id="connText">connecting to signaling server…</span></p>
+    </section>
+
+    <!-- HOST VIEW -->
+    <section id="hostView" class="hidden">
+      <h1>Your circle is <em>live</em>.</h1>
+      <div class="stage">
+        <div class="row">
+          <div>
+            <div class="muted">Room code</div>
+            <div class="code" id="roomCode">------</div>
+          </div>
+          <span class="pill"><span class="dot on"></span><span id="peerCount">0</span> joined</span>
+        </div>
+        <div class="share">
+          <input type="text" id="shareLink" readonly>
+          <button class="btn ghost" id="copyBtn">Copy link</button>
+        </div>
+        <p class="muted" style="margin-top:12px">Send this link to people you trust. They join straight from their browser — nothing to install.</p>
+      </div>
+
+      <div class="stage" id="outStage">
+        <div class="row" style="margin-bottom:6px">
+          <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Output</h2>
+          <button class="chip active" id="spectateBtn" title="Broadcast a live preview of the output to every node">Broadcast to nodes</button>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="k">Linked devices</div><div class="v" id="sDevices">1</div></div>
+          <div class="stat"><div class="k">Chunks</div><div class="v" id="sChunks">0/0</div></div>
+          <div class="stat"><div class="k">Engine</div><div class="v" id="sEngine" style="font-size:15px">WASM/JS · worker</div></div>
+          <div class="stat"><div class="k">Elapsed</div><div class="v" id="sElapsed">—</div></div>
+        </div>
+        <div class="bar"><i id="progBar"></i></div>
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <div class="log" id="jobOut"></div>
+        <div class="log" id="hostLog"></div>
+        <div class="log" id="usage"></div>
+      </div>
+
+      <div class="stage" id="sceneStage">
+        <div class="row">
+          <div>
+            <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Live scene — stream to the circle</h2>
+            <p class="muted">Render here and broadcast the video to every device over WebRTC. Viewers move their pointer to interact — their input flows back over the data channel.</p>
+          </div>
+          <button class="btn" id="liveBtn">Go live</button>
+        </div>
+        <canvas id="scene" width="640" height="400"></canvas>
+        <div class="log" id="sceneLog"></div>
+      </div>
+
+      <div class="stage" id="modelStage">
+        <div class="row" style="margin-bottom:4px">
+          <div>
+            <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Models — run a model too big for one device</h2>
+            <p class="muted">Split a model&#39;s <em>layers</em> across the circle (pipeline parallelism). The heavy embedding &amp; head run on capable devices; phones hold interior layers. Each token, only a few KB of <code>hidden_states</code> travel device&#8594;device. Placement is capability-aware. <span class="muted">Demo: distilgpt2 sharded across this device + one peer.</span></p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="mModel" style="background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:9px;font:inherit;font-size:13px">
+              <option value="qwen">Qwen2.5-0.5B-Instruct — answers questions</option>
+              <option value="qwen15">Qwen2.5-1.5B-Instruct — bigger, answers questions</option>
+              <option value="qwen15n">Qwen2.5-1.5B — 3-device chain (2 stages)</option>
+              <option value="qwen3b">Qwen2.5-Coder-3B-Instruct</option>
+              <option value="mistral7b">Mistral-7B-Instruct-v0.3 — distributed</option>
+              <option value="distilgpt2">distilgpt2 — 82M, fast (completes text)</option>
+            </select>
+            <button class="btn" id="shardBtn">Set up the model pipeline</button>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="k">Pipeline</div><div class="v" id="mPipe" style="font-size:15px">&#8212;</div></div>
+          <div class="stat"><div class="k">Middle node</div><div class="v" id="mPeer" style="font-size:15px">&#8212;</div></div>
+          <div class="stat"><div class="k">Hop size</div><div class="v" id="mHop" style="font-size:15px">&#8212;</div></div>
+          <div class="stat"><div class="k">Decode</div><div class="v" id="mTps">&#8212;</div></div>
+        </div>
+        <div style="margin-top:12px">
+          <textarea id="mPrompt" spellcheck="false" placeholder="set up the pipeline, then ask anything…" style="width:100%;min-height:54px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:10px;font:inherit;font-size:14px;text-transform:none;letter-spacing:0">The future of distributed computing is</textarea>
+          <div class="row" style="margin-top:8px">
+            <label style="color:var(--ink-soft);font-size:13px">max new tokens <input id="mMax" type="number" value="40" min="1" max="64" style="width:64px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
+            <label style="color:var(--ink-soft);font-size:13px;margin-left:10px">temp <input id="mTemp" type="number" value="0.8" min="0" max="1.5" step="0.1" style="width:56px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
+            <button class="btn" id="genBtn" disabled>Generate</button>
+          </div>
+        </div>
+        <div id="modelOut" style="font-family:var(--mono);font-size:15px;white-space:pre-wrap;min-height:2em;margin-top:10px;color:var(--ink)"></div>
+        <div class="log" id="modelLog"></div>
+      </div>
+      <div class="stage" id="labStage">
+        <div class="row" style="margin-bottom:4px">
+          <div>
+            <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Code lab — write code to run in your circle</h2>
+            <p class="muted">A private in-browser workspace. Every project is editable code: a <code>.wgsl</code> compute shader runs on the circle’s GPUs; <code>.js</code> / <code>.wat</code> / <code>.wasm</code> kernels run across the CPU cores. Build &amp; run farms it across every linked device. <span id="labLang" style="font-family:var(--mono)"></span></p>
+          </div>
+          <div class="taskpick" id="projPick"></div>
+        </div>
+        <div class="lab">
+          <div class="filetree">
+            <div id="fileList"></div>
+            <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+              <button class="chip" id="newFileBtn">+ file</button>
+              <button class="chip" id="uploadBtn">upload</button>
+              <button class="chip" id="newProjBtn">+ project</button>
+              <input type="file" id="uploadInput" multiple class="hidden">
+            </div>
+          </div>
+          <div class="editorpane">
+            <div class="row" style="margin-bottom:6px">
+              <span id="curFile" style="font-family:var(--mono);font-size:12px;color:var(--ink-soft)"></span>
+              <button class="chip" id="delFileBtn">delete file</button>
+            </div>
+            <textarea id="editor" spellcheck="false" placeholder="select or create a file…"></textarea>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field" style="max-width:300px">
+            <button class="btn" id="buildRunBtn">Build &amp; run in circle</button>
+          </div>
+          <span id="labResult" style="font-family:var(--mono);font-size:13px;color:var(--ink-soft)"></span>
+        </div>
+        <p class="muted" style="margin-top:8px">CPU kernels export <code>run(lo, hi, chunk)</code> and return a typed result (number, log, tile, image, points). Declare work size in the script — JS: <code>const OSIRIS = {n, parts, label}</code>; WAT/WASM: export <code>osiris_n</code> / <code>osiris_parts</code>. GPU kernels are <code>.wgsl</code> compute shaders: a <code>//!osiris {…}</code> header declares <code>parts</code>/<code>W</code>/<code>H</code>/<code>maxIter</code>/<code>p[]</code>, and each writes one packed-RGBA <code>u32</code> per pixel.</p>
+        <div class="log" id="labLog"></div>
+      </div>
+    </section>
+
+    <!-- WORKER VIEW -->
+    <section id="workerView" class="hidden">
+      <h1>You're in the <em>circle</em>.</h1>
+      <div class="stage">
+        <div class="row">
+          <div>
+            <div class="muted">Connected to room</div>
+            <div class="code" id="wRoomCode">------</div>
+          </div>
+          <span class="pill"><span class="dot" id="wDot"></span><span id="wStatus">linking…</span></span>
+        </div>
+        <p class="muted" style="margin-top:14px">Keep this tab open and in front of you. Your device contributes compute to the circle only while this tab is visible — work runs in a background thread, so the page stays responsive. Close it any time to stop.</p>
+        <div class="stat-grid">
+          <div class="stat"><div class="k">Chunks computed</div><div class="v" id="wTiles">0</div></div>
+          <div class="stat"><div class="k">Link state</div><div class="v" id="wLink" style="font-size:16px">—</div></div>
+        </div>
+        <div class="log" id="workerLog"></div>
+      </div>
+
+      <div class="stage hidden" id="wOutStage">
+        <div class="muted">Live output — what the circle is building right now</div>
+        <canvas id="wCanvas" width="640" height="480"></canvas>
+        <div class="log" id="wOut"></div>
+      </div>
+
+      <div class="stage hidden" id="wShardStage">
+        <div class="muted">Your shard of a distributed model</div>
+        <div id="wShardInfo" style="font-family:var(--mono);font-size:14px;margin-top:6px">&#8212;</div>
+        <div class="log" id="wShardLog"></div>
+      </div>
+      <div class="stage hidden" id="streamStage">
+        <div class="muted">Live from the host — move your pointer over the video to interact</div>
+        <video id="streamVid" autoplay playsinline muted></video>
+      </div>
+    </section>
+
+    <!-- CHAT (shared by host + workers) -->
+    <section id="chat" class="hidden">
+      <div class="stage">
+        <div class="row" style="margin-bottom:10px">
+          <h2 style="font-family:var(--serif);font-weight:400;font-size:20px">Circle chat</h2>
+          <div class="field" style="max-width:220px"><input type="text" id="chatName" maxlength="20" placeholder="your name" style="text-transform:none;letter-spacing:0;font-size:13px"></div>
+        </div>
+        <div id="presence" class="presence"></div>
+        <div id="chatLog" class="chatlog"></div>
+        <div class="field" style="margin-top:12px">
+          <input type="text" id="chatInput" placeholder="message the circle…" maxlength="500" style="text-transform:none;letter-spacing:0">
+          <button class="btn" id="chatSend">Send</button>
+        </div>
+        <p class="muted" style="margin-top:10px">Messages travel directly between devices over the same P2P link — the server never sees them.</p>
+      </div>
+    </section>
+  </div>
+
+  <footer class="wrap">
+    Osiris Compute · a non-commercial public utility by <a href="https://osirisindustries.net/">Osiris Industries</a> · the signaling server never sees your computation.
+  </footer>
+
+<!-- ===================================================================== -->
+<!-- Pure compute kernels. Loaded as text and run inside a Web Worker (no   -->
+<!-- DOM, off the main thread). This is the "task module" layer: add a      -->
+<!-- kernel here + a TASKS entry below and the circle can run it.           -->
+<!-- ===================================================================== -->
+<script id="kernel-src" type="text/plain">
+"use strict";
+
+// ---- General typed-output ABI (shared by all code kernels) ----
+var userMods = {};
+function normalize(res){
+  if (res === undefined || res === null) return {kind:"null"};
+  if (typeof res === "number") return {kind:"number", value:res};
+  if (typeof res === "string") return {kind:"log", text:res};
+  if (typeof res === "object"){
+    if ((res.kind==="tile" || res.kind==="image") && res.rgba && !res.b64){
+      var a=res.rgba, u=new Uint8Array(a.length); for (var i=0;i<a.length;i++) u[i]=a[i]&255;
+      var str=""; for (var j=0;j<u.length;j++) str+=String.fromCharCode(u[j]);
+      var o={kind:res.kind, w:res.w|0, h:res.h|0, b64:btoa(str)};
+      if (res.kind==="tile"){
+        o.x=res.x|0; o.y=res.y|0;
+        if (res.dw!=null) o.dw=res.dw|0; if (res.dh!=null) o.dh=res.dh|0;
+        if (res.bg) o.bg={x:res.bg.x|0, y:res.bg.y|0, w:res.bg.w|0, h:res.bg.h|0};
+        if (res.caption!=null) o.caption=String(res.caption);
+        if (res.sub!=null) o.sub=String(res.sub);
+      }
+      return o;
+    }
+    return res;
+  }
+  return {kind:"json", data:res};
+}
+function kUser(chunk){
+  var m = userMods[chunk.moduleId];
+  if (!m || !m.run) return new Uint8Array(0);
+  if (m.lang === "js"){
+    var res; try { res = m.run(chunk.lo|0, chunk.hi|0, chunk); } catch(e){ res = {kind:"error", text:String((e&&e.message)||e)}; }
+    return new TextEncoder().encode(JSON.stringify(normalize(res)));
+  }
+  var v=0; try { v = m.run(chunk.lo|0, chunk.hi|0)|0; } catch(e){ v=0; }
+  var o = new Uint8Array(4); new DataView(o.buffer).setInt32(0, v, true); return o;
+}
+self.onmessage = function(ev){
+  var d=ev.data, bytes;
+  if (d.kind==="load-module"){
+    var ok=false;
+    try {
+      if (d.lang==="js"){ var mod=new Function(d.src+"\n;return { run:(typeof run!==\"undefined\"?run:null), config:(typeof OSIRIS!==\"undefined\"?OSIRIS:(typeof config===\"function\"?config():null)) };")(); if (mod && typeof mod.run==="function"){ userMods[d.moduleId]={run:mod.run, lang:"js", config:mod.config||null}; ok=true; } }
+      else { var bin=atob(d.b64), u=new Uint8Array(bin.length); for (var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); var exp=new WebAssembly.Instance(new WebAssembly.Module(u), {}).exports; var cfg=null; try{ if(exp.osiris_n||exp.osiris_parts){ cfg={}; if(exp.osiris_n)cfg.n=exp.osiris_n()|0; if(exp.osiris_parts)cfg.parts=exp.osiris_parts()|0; } }catch(e){} userMods[d.moduleId]={run:exp.run, lang:"wasm", exports:exp, config:cfg}; ok=true; }
+    } catch(e){ userMods[d.moduleId]=null; }
+    self.postMessage({kind:"loaded", moduleId:d.moduleId, ok:ok, config:(userMods[d.moduleId]&&userMods[d.moduleId].config)||null}); return;
+  }
+  if (d.task==="userwasm") bytes = kUser(d.chunk);
+  else bytes = new Uint8Array(0);
+  var buf = new ArrayBuffer(8 + bytes.length), dv = new DataView(buf);
+  dv.setUint32(0, d.epoch>>>0, true); dv.setUint32(4, d.chunkId>>>0, true);
+  new Uint8Array(buf, 8).set(bytes);
+  self.postMessage(buf, [buf]);
+};
+</script>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  let ICE = { iceServers: [ { urls: "stun:stun.l.google.com:19302" } ] };
+  const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+  let ws, selfId, roomId, role = null, wakeLock = null, selectedTask = "mandelbrot";
+
+  // ---- chat + presence (rides the existing data channel; star topology, host relays) ----
+  const ADJ=["swift","calm","bright","bold","quiet","keen","brave","wry","lucid","sly"];
+  const ANIM=["otter","heron","lynx","crane","ibex","marten","vireo","sable","tern","fox"];
+  let myName = ADJ[Math.floor(Math.random()*ADJ.length)]+"-"+ANIM[Math.floor(Math.random()*ANIM.length)];
+  function chatAppend(name, text, mine, system){
+    const box=$("chatLog"); if (!box) return;
+    const d=document.createElement("div"); d.className="msg"+(mine?" mine":"")+(system?" sys":"");
+    if (system){ d.textContent=text; }
+    else { const w=document.createElement("span"); w.className="who"; w.textContent=name; const b=document.createElement("span"); b.textContent=text; d.appendChild(w); d.appendChild(b); }
+    box.appendChild(d); box.scrollTop=box.scrollHeight;
+  }
+  function renderPresence(list){
+    const el=$("presence"); if (!el) return; el.innerHTML="";
+    list.forEach(p=>{ const s=document.createElement("span"); s.className="who-pill"; s.textContent=p.name+(p.host?" \u2605":""); el.appendChild(s); });
+  }
+  function sendChat(){
+    const inp=$("chatInput"), text=(inp.value||"").trim(); if (!text) return; inp.value="";
+    const msg=JSON.stringify({cmd:"chat", id:selfId, name:myName, text:text, ts:Date.now()});
+    chatAppend(myName, text, true, false);
+    if (role==="host"){ for (const p of host.peers.values()) if (p.channel && p.channel.readyState==="open"){ try{ p.channel.send(msg); }catch(e){} } }
+    else if (role==="worker" && worker.channel && worker.channel.readyState==="open"){ try{ worker.channel.send(msg); }catch(e){} }
+  }
+
+  function log(el, msg){ const d=document.createElement("div"); d.textContent="["+new Date().toLocaleTimeString()+"] "+msg; el.prepend(d); }
+  async function requestWakeLock(){ try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch(e){} }
+  async function loadIce(){ try { const r=await fetch("/ice",{cache:"no-store"}); if (r.ok){ const j=await r.json(); if (j&&j.iceServers&&j.iceServers.length) ICE={iceServers:j.iceServers}; } } catch(e){} }
+
+  // ---- compute engines: multi-core CPU worker pool + optional WebGPU ----
+  const HW = Math.max(1, Math.min(16, navigator.hardwareConcurrency || 4));
+  let _pool = null;
+  const _jobs = new Map(); // "epoch:chunkId" -> resolve
+  function pool(){
+    if (!_pool){
+      const url = URL.createObjectURL(new Blob([$("kernel-src").textContent], {type:"application/javascript"}));
+      _pool = { idle:[], queue:[], workers:[] };
+      for (let i=0;i<HW;i++){ const w=new Worker(url); w.onmessage=ev=>onPoolMsg(w, ev.data); _pool.idle.push(w); _pool.workers.push(w); }
+    }
+    return _pool;
+  }
+  function onPoolMsg(w, data){
+    if (data && data.kind==="loaded"){ if (w._loadcb && w._loadcb[data.moduleId]){ w._loadcb[data.moduleId](data); delete w._loadcb[data.moduleId]; } return; }
+    onPoolDone(w, data);
+  }
+  function abToB64(u8){ let s=""; for (let i=0;i<u8.length;i++) s+=String.fromCharCode(u8[i]); return btoa(s); }
+  function b64ToU8(b64){ const bin=atob(b64), u=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+  function hashBytes(u8){ let h=2166136261>>>0; for (let i=0;i<u8.length;i++){ h^=u8[i]; h=Math.imul(h,16777619); } return "m"+(h>>>0).toString(16); }
+  function hashStr(str){ let h=2166136261>>>0; for (let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return "mjs"+(h>>>0).toString(16); }
+  function poolLoadModule(moduleId, lang, payload){
+    const P=pool();
+    const msg = (lang==="js") ? {kind:"load-module", moduleId, lang:"js", src:payload} : {kind:"load-module", moduleId, lang:"wasm", b64:abToB64(payload)};
+    return Promise.all(P.workers.map(w=> new Promise(res=>{ w._loadcb=w._loadcb||{}; w._loadcb[moduleId]=res; w.postMessage(msg); }))).then(rs=>{ for (const r of rs){ if (r && r.config) return r.config; } return null; });
+  }
+  // WAT -> wasm in-browser via self-hosted wabt.js
+  let _wabtP=null;
+  function loadWabt(){ if(!_wabtP){ _wabtP=new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src="/wabt.js"; sc.onload=()=>{ (self.WabtModule||window.WabtModule)().then(res, rej); }; sc.onerror=()=>rej(new Error("failed to load wabt.js")); document.head.appendChild(sc); }); } return _wabtP; }
+  async function compileWat(src){ const wabt=await loadWabt(); const m=wabt.parseWat("m.wat", src, {}); const out=m.toBinary({}); try{ m.destroy(); }catch(e){} return new Uint8Array(out.buffer); }
+  function onPoolDone(w, buf){
+    const dv=new DataView(buf), key=dv.getUint32(0,true)+":"+dv.getUint32(4,true), r=_jobs.get(key);
+    if (r){ _jobs.delete(key); r(buf); }
+    _pool.idle.push(w); drainPool();
+  }
+  function drainPool(){ const P=pool(); while (P.idle.length && P.queue.length){ P.idle.shift().postMessage(P.queue.shift()); } }
+  function runOnPool(task, epoch, chunkId, chunk){
+    return new Promise(res=>{ _jobs.set((epoch>>>0)+":"+(chunkId>>>0), res); pool().queue.push({task,epoch,chunkId,chunk}); drainPool(); });
+  }
+
+  // WebGPU device (lazy). Each .wgsl kernel compiles to its own compute pipeline.
+  let _gpu = undefined;
+  async function gpu(){
+    if (_gpu !== undefined) return _gpu;
+    try {
+      if (!navigator.gpu){ _gpu=null; return null; }
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter){ _gpu=null; return null; }
+      const device = await adapter.requestDevice();
+      _gpu = { device };
+    } catch(e){ _gpu=null; }
+    return _gpu;
+  }
+  const gpuMods = {};   // moduleId -> { device, pipeline, cfg }
+  function parseWgslConfig(src){
+    const line = (src.split("\n").find(l => l.trim().indexOf("//!osiris")===0)) || "";
+    const j = line.slice(line.indexOf("//!osiris")+9).trim();
+    if (!j) return {};
+    try { return JSON.parse(j); } catch(e){ return {}; }
+  }
+  async function loadWGSLModule(moduleId, src){
+    const g = await gpu(); if (!g) throw new Error("no WebGPU on this device");
+    const device = g.device, cfg = parseWgslConfig(src);
+    const module = device.createShaderModule({ code: src });
+    if (module.getCompilationInfo){
+      try { const info = await module.getCompilationInfo(); const err = (info.messages||[]).find(m => m.type==="error");
+        if (err) throw new Error("WGSL: "+err.message+" (line "+err.lineNum+")"); }
+      catch(e){ if (/^WGSL:/.test(e.message)) throw e; }
+    }
+    const pipeline = device.createComputePipeline({ layout:"auto", compute:{ module, entryPoint:"main" } });
+    gpuMods[moduleId] = { device, pipeline, cfg };
+    return cfg;
+  }
+  // Run one band of a WGSL kernel on this device's GPU. Output is packed RGBA8 (one u32/pixel).
+  async function runWGSLChunk(moduleId, epoch, chunkId, chunk){
+    const g = gpuMods[moduleId]; if (!g) return null;
+    const device = g.device, pipeline = g.pipeline;
+    const W=chunk.W|0, bandH=chunk.bandH|0, total=W*bandH; if (total<=0) return null;
+    const ubuf = device.createBuffer({ size:48, usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST });
+    const ua = new ArrayBuffer(48), dv = new DataView(ua), P = chunk.p || [];
+    dv.setUint32(0,W,true); dv.setUint32(4,chunk.H|0,true); dv.setUint32(8,chunk.y0|0,true); dv.setUint32(12,bandH,true);
+    dv.setUint32(16,chunk.index>>>0,true); dv.setUint32(20,chunk.parts>>>0,true); dv.setUint32(24,chunk.n>>>0,true); dv.setUint32(28,chunk.maxIter>>>0,true);
+    dv.setFloat32(32,+P[0]||0,true); dv.setFloat32(36,+P[1]||0,true); dv.setFloat32(40,+P[2]||0,true); dv.setFloat32(44,+P[3]||0,true);
+    device.queue.writeBuffer(ubuf, 0, ua);
+    const obuf = device.createBuffer({ size:total*4, usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC });
+    const rbuf = device.createBuffer({ size:total*4, usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ });
+    const bind = device.createBindGroup({ layout:pipeline.getBindGroupLayout(0), entries:[ {binding:0,resource:{buffer:ubuf}}, {binding:1,resource:{buffer:obuf}} ] });
+    const enc = device.createCommandEncoder(); const pass = enc.beginComputePass(); pass.setPipeline(pipeline); pass.setBindGroup(0, bind);
+    pass.dispatchWorkgroups(Math.ceil(total/64)); pass.end();
+    enc.copyBufferToBuffer(obuf, 0, rbuf, 0, total*4); device.queue.submit([enc.finish()]);
+    await rbuf.mapAsync(GPUMapMode.READ);
+    const srcBytes = new Uint8Array(rbuf.getMappedRange());
+    const out = new ArrayBuffer(8 + total*4), dvo = new DataView(out);
+    dvo.setUint32(0, epoch>>>0, true); dvo.setUint32(4, chunkId>>>0, true);
+    new Uint8Array(out, 8).set(srcBytes);
+    rbuf.unmap(); ubuf.destroy(); obuf.destroy(); rbuf.destroy();
+    return out;
+  }
+  // Router: .wgsl -> GPU; .js/.wat/.wasm -> CPU worker pool.
+  async function runKernel(task, epoch, chunkId, chunk){
+    if (task==="userwgsl"){
+      try { const r = await runWGSLChunk(chunk.moduleId, epoch, chunkId, chunk); if (r) return r; }
+      catch(e){ console.warn("WGSL run failed:", e.message); }
+      const total=(chunk.W|0)*(chunk.bandH|0), out=new ArrayBuffer(8+total*4), dv=new DataView(out);
+      dv.setUint32(0,epoch>>>0,true); dv.setUint32(4,chunkId>>>0,true); return out;
+    }
+    return runOnPool(task, epoch, chunkId, chunk);
+  }
+
+  // ---- device specs ----
+  function deviceSpecs(){
+    let gpu="unknown";
+    try { const c=document.createElement("canvas"); const gl=c.getContext("webgl")||c.getContext("experimental-webgl");
+      if (gl){ const dbg=gl.getExtension("WEBGL_debug_renderer_info"); gpu=dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):(gl.getParameter(gl.RENDERER)||"unknown"); } } catch(e){}
+    return { cores:navigator.hardwareConcurrency||null, mem:(typeof navigator.deviceMemory==="number")?navigator.deviceMemory:null,
+             gpu:String(gpu).replace(/^ANGLE \(/,"").replace(/\)$/,""), platform:navigator.platform||"" };
+  }
+  function specSummary(s){ if (!s) return "specs n/a";
+    return (s.cores?s.cores+" cores":"? cores")+" · "+(s.mem?s.mem+"GB RAM":"RAM n/a")+" · "+(s.gpu||"GPU n/a"); }
+
+  // =========================================================================
+  // TASK REGISTRY — host-side chunking + integration. Kernels live in the worker.
+  // =========================================================================
+  const TASKS = {
+    userwasm: {
+      label: "Custom module",
+      reset(){ view.sum=0; view.label=host.userLabel; view.n=host.userN;
+        const cv=$(OUT.cv); cv.width=640; cv.height=480; const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height);
+        x.fillStyle="#cfcfca"; x.font="15px 'IBM Plex Mono', monospace"; x.textAlign="center"; x.fillText("running "+(host.userLabel||"module")+" across the circle…", cv.width/2, cv.height/2);
+        if ($("labResult")) $("labResult").textContent=""; if ($(OUT.out)) $(OUT.out).innerHTML=""; },
+      makeChunks(){ const N=host.userN||1, parts=Math.max(1, host.userParts||16), sz=Math.max(1,Math.ceil(N/parts)), out=[];
+        for (let i=0;i<parts;i++){ const lo=i*sz; out.push({ moduleId:host.moduleId, lo:lo, hi:Math.min(lo+sz,N), index:i, parts:parts, n:N }); }
+        return out; },
+      integrate(cid, chunk, bytes){
+        let res;
+        if (host.moduleLang === "js"){ try { res = JSON.parse(new TextDecoder().decode(bytes)); } catch(e){ res = {kind:"log", text:"(unparseable result)"}; } }
+        else { res = {kind:"number", value:new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getInt32(0,true)}; }
+        renderResult(res, chunk);
+      }
+    },
+    userwgsl: {
+      label: "WGSL kernel",
+      reset(){ const c=host.wgslCfg||{}, cv=$(OUT.cv); cv.width=c.W||640; cv.height=c.H||480;
+        const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height);
+        x.fillStyle="#cfcfca"; x.font="15px 'IBM Plex Mono', monospace"; x.textAlign="center"; x.fillText("running "+(host.userLabel||"WGSL kernel")+" on the circle's GPUs…", cv.width/2, cv.height/2);
+        if ($("labResult")) $("labResult").textContent=""; if ($(OUT.out)) $(OUT.out).innerHTML=""; },
+      makeChunks(){ const c=host.wgslCfg||{}, W=c.W||640, H=c.H||480, parts=Math.max(1, host.userParts||16),
+          band=Math.max(1, Math.ceil(H/parts)), p=c.p||[], maxIter=c.maxIter||256, out=[];
+        for (let y=0;y<H;y+=band) out.push({ moduleId:host.moduleId, W:W, H:H, y0:y, bandH:Math.min(band,H-y), index:(y/band)|0, parts:parts, n:W*H, p:p, maxIter:maxIter });
+        return out; },
+      integrate(cid, chunk, bytes){
+        const ctx=$(OUT.cv).getContext("2d"), total=chunk.W*chunk.bandH*4;
+        const img=ctx.createImageData(chunk.W, chunk.bandH); img.data.set(bytes.subarray(0, total)); ctx.putImageData(img, 0, chunk.y0);
+      }
+    }
+  };
+
+  let OUT = { cv:"canvas", out:"jobOut" };           // host renders here; peers switch to their own
+  const view = { sum:0, label:"module", n:0 };        // shared accumulator (works on host + spectating peers)
+  function appendOut(text){ const el=$(OUT.out); if(!el) return; const d=document.createElement("div"); d.textContent=text; el.appendChild(d); el.scrollTop=el.scrollHeight; }
+  function drawBig(num, label){ const cv=$(OUT.cv); if(!cv) return; const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height);
+    x.fillStyle="#f1f1ef"; x.font="44px Fraunces, serif"; x.textAlign="center"; x.fillText(String(num), cv.width/2, cv.height/2);
+    x.fillStyle="#8a8a86"; x.font="13px 'IBM Plex Mono', monospace"; x.fillText(label||"", cv.width/2, cv.height/2+34); }
+  function renderResult(res, chunk){
+    if (res==null) return;
+    const cv=$(OUT.cv); if(!cv) return; const ctx=cv.getContext("2d");
+    switch(res.kind){
+      case "number": view.sum += (+res.value||0); drawBig(view.sum, "Σ run("+(view.label||"module")+") over [0, "+view.n+")"); if($("labResult")) $("labResult").textContent="Σ = "+view.sum; break;
+      case "log": case "text": appendOut(res.text!=null?String(res.text):""); break;
+      case "tile": try {
+        const u=b64ToU8(res.b64);
+        if (res.dw==null && res.dh==null && !res.bg && res.caption==null && res.sub==null){
+          const img=ctx.createImageData(res.w,res.h); img.data.set(u); ctx.putImageData(img, res.x|0, res.y|0);
+        } else {
+          if (res.bg){ ctx.fillStyle="#0b0b0c"; ctx.fillRect(res.bg.x|0,res.bg.y|0,res.bg.w|0,res.bg.h|0); }
+          const off=document.createElement("canvas"); off.width=res.w; off.height=res.h;
+          const octx=off.getContext("2d"), oi=octx.createImageData(res.w,res.h); oi.data.set(u); octx.putImageData(oi,0,0);
+          const dx=res.x|0, dy=res.y|0, dw=(res.dw!=null?res.dw:res.w), dh=(res.dh!=null?res.dh:res.h);
+          ctx.imageSmoothingEnabled=false; ctx.drawImage(off, dx, dy, dw, dh);
+          if (res.caption!=null){ ctx.fillStyle="#8a8a86"; ctx.font="10px 'IBM Plex Mono', monospace"; ctx.textAlign="center"; ctx.fillText(res.caption, dx+dw/2, dy+dh+12); }
+          if (res.sub!=null){ ctx.fillStyle="#cfcfca"; ctx.font="10px 'IBM Plex Mono', monospace"; ctx.textAlign="center"; ctx.fillText(res.sub, dx+dw/2, dy+dh+24); }
+        }
+      } catch(e){ appendOut("tile err: "+e.message); } break;
+      case "image": try { const u=b64ToU8(res.b64); const off=document.createElement("canvas"); off.width=res.w; off.height=res.h; const octx=off.getContext("2d"); const oi=octx.createImageData(res.w,res.h); oi.data.set(u); octx.putImageData(oi,0,0); ctx.fillStyle="#0b0b0c"; ctx.fillRect(0,0,cv.width,cv.height); ctx.imageSmoothingEnabled=false; ctx.drawImage(off,0,0,cv.width,cv.height); } catch(e){ appendOut("image err: "+e.message); } break;
+      case "points": ctx.fillStyle=res.color||"#7fd1a3"; for (const p of (res.pts||[])) ctx.fillRect(p[0]|0, p[1]|0, 2, 2); break;
+      case "json": appendOut(typeof res.data==="string"?res.data:JSON.stringify(res.data)); break;
+      case "error": appendOut("\u26a0 "+res.text); break;
+      case "null": break;
+      default: appendOut(JSON.stringify(res));
+    }
+  }
+  function palette(v){ if (v===0) return [6,6,8]; const t=v/255; return [Math.round(30+200*t), Math.round(20+120*Math.sqrt(t)), Math.round(60+160*(1-t))]; }
+
+  // ---- WebSocket signaling ----
+  function connect(){
+    ws=new WebSocket(WS_URL);
+    ws.onopen=()=>{ $("connDot").classList.add("on"); $("connText").textContent="connected — ready";
+      const pre=new URLSearchParams(location.search).get("room"); if (pre){ $("joinCode").value=pre.toUpperCase(); doJoin(pre); } };
+    ws.onclose=()=>{ $("connDot").classList.remove("on"); $("connText").textContent="disconnected — refresh to reconnect"; };
+    ws.onerror=()=>{ $("connText").textContent="signaling error — refresh"; };
+    ws.onmessage=ev=>handle(JSON.parse(ev.data));
+  }
+  function sig(obj){ ws.send(JSON.stringify(obj)); }
+  function handle(m){
+    switch(m.type){
+      case "created": onCreated(m); break;
+      case "joined": onJoined(m); break;
+      case "peer-joined": host.onPeerJoined(m.peerId); break;
+      case "peer-left": host.onPeerLeft(m.peerId); break;
+      case "host-left": worker.onHostLeft(); break;
+      case "signal": onSignal(m); break;
+      case "error": onError(m); break;
+    }
+  }
+  function onError(m){ if (role===null){ alert("Could not join: "+m.error+(m.error==="no-such-room"?"\n\nCheck the code, or the host may have closed the circle.":"")); } }
+
+  function makeIceQueue(pc){
+    const q=[]; let ready=false;
+    return { async add(c){ if (ready){ try{ await pc.addIceCandidate(c); }catch(e){} } else q.push(c); },
+             async ready(){ ready=true; while(q.length){ try{ await pc.addIceCandidate(q.shift()); }catch(e){} } } };
+  }
+
+  // =========================================================================
+  // CODE LAB — in-browser project file system + editor (localStorage-backed)
+  // =========================================================================
+  const LANGS = { c:"C", cc:"C++", cpp:"C++", rs:"Rust", go:"Go", ts:"AssemblyScript", py:"Python", wat:"WebAssembly text", wasm:"WASM binary", wgsl:"WGSL (GPU)", md:"Markdown", txt:"text" };
+  const CLIENT_COMPILE = { wat:true, ts:true, wasm:true, wgsl:true };  // run in-browser (no server)
+  function langOf(name){ const ext=(name.split(".").pop()||"").toLowerCase(); return LANGS[ext]||ext; }
+
+  const DEMO_VERSION = 8;
+  const DEMO_PROJECTS = {
+    "mandelbrot": { files: {
+      "mandel.wgsl": "//!osiris {\"label\":\"Mandelbrot (GPU)\",\"parts\":30,\"W\":640,\"H\":480,\"maxIter\":360,\"p\":[-0.743643887,0.131825904,0.0000045,0]}\n// Osiris WGSL kernel \u2014 runs on every GPU in the circle, one horizontal band per chunk.\n// The host fills uniform P per band; write one packed-RGBA u32 per pixel into outp.\nstruct P {\n  W : u32, H : u32, y0 : u32, bandH : u32,\n  index : u32, parts : u32, n : u32, maxIter : u32,\n  p0 : f32, p1 : f32, p2 : f32, p3 : f32,   // p0 = center x, p1 = center y, p2 = scale (zoom)\n};\n@group(0) @binding(0) var<uniform> p : P;\n@group(0) @binding(1) var<storage, read_write> outp : array<u32>;\n\nfn pack(r : u32, g : u32, b : u32) -> u32 { return r | (g << 8u) | (b << 16u) | (255u << 24u); }\n\n@compute @workgroup_size(64)\nfn main(@builtin(global_invocation_id) gid : vec3<u32>) {\n  let idx = gid.x;\n  let total = p.W * p.bandH;\n  if (idx >= total) { return; }\n  let px = idx % p.W;\n  let py = p.y0 + idx / p.W;\n  let cr = p.p0 + (f32(px) - f32(p.W) * 0.5) * p.p2;\n  let ci = p.p1 + (f32(py) - f32(p.H) * 0.5) * p.p2;\n  var x = 0.0; var y = 0.0; var i : u32 = 0u;\n  loop {\n    if (x * x + y * y > 4.0 || i >= p.maxIter) { break; }\n    let xt = x * x - y * y + cr;\n    y = 2.0 * x * y + ci; x = xt; i = i + 1u;\n  }\n  if (i >= p.maxIter) { outp[idx] = pack(6u, 6u, 8u); return; }\n  let t = f32(i % 256u) / 255.0;\n  let r = u32(30.0 + 200.0 * t);\n  let g = u32(20.0 + 120.0 * sqrt(t));\n  let b = u32(60.0 + 160.0 * (1.0 - t));\n  outp[idx] = pack(r, g, b);\n}\n",
+      "README.md": "# Mandelbrot \u2014 WGSL GPU kernel\n\nThis *is* the engine, and it's editable. It's a WebGPU compute shader (WGSL) that\nruns on every GPU in the circle \u2014 each linked device renders horizontal bands in\nparallel.\n\nThe `//!osiris {\u2026}` header declares the work:\n- `parts` \u2014 number of bands (chunks) the image is split into\n- `W`, `H` \u2014 image size\n- `maxIter` \u2014 fractal detail\n- `p` \u2014 four floats handed to the shader (here p0 = center x, p1 = center y, p2 = zoom scale)\n\nChange those, or rewrite the shader body, to make your own GPU kernel: write one\npacked-RGBA `u32` per pixel into `outp`. Hit **Build & run in circle** \u2014 devices\nwithout a GPU sit this one out; the rest split the bands.\n" } },
+    "simp-topopt": { files: {
+      "simp.js": "const OSIRIS = { parts: 8, label: \"SIMP topology optimization\" };\n// 2D SIMP topology optimization \u2014 matrix-free FE + Optimality-Criteria update +\n// sensitivity filtering (the classic Sigmund 99-line method, ported to JS).\n// Each chunk runs ONE complete optimization for a different design point; the\n// circle fills a gallery in parallel.\n\nfunction elementK(nu){\n  var k = [1/2-nu/6, 1/8+nu/8, -1/4-nu/12, -1/8+3*nu/8, -1/4+nu/12, -1/8-nu/8, nu/6, 1/8-3*nu/8];\n  var idx = [[0,1,2,3,4,5,6,7],[1,0,7,6,5,4,3,2],[2,7,0,5,6,3,4,1],[3,6,5,0,7,2,1,4],\n             [4,5,6,7,0,1,2,3],[5,4,3,2,1,0,7,6],[6,3,4,1,2,7,0,5],[7,2,1,4,3,6,5,0]];\n  var KE = [], c = 1/(1-nu*nu);\n  for (var i=0;i<8;i++){ KE[i]=new Float64Array(8); for (var j=0;j<8;j++) KE[i][j]=c*k[idx[i][j]]; }\n  return KE;\n}\nfunction edofOf(ex, ey, nely){\n  var n1 = (nely+1)*ex + ey, n2 = (nely+1)*(ex+1) + ey;\n  return [2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n2+2, 2*n2+3, 2*n1+2, 2*n1+3];\n}\nfunction solveCG(x, penal, KE, edof, ndof, F, fixed, Emin, E0, nelx, nely, tol, maxit){\n  var u = new Float64Array(ndof), free = new Uint8Array(ndof); free.fill(1);\n  for (var fi=0;fi<fixed.length;fi++) free[fixed[fi]] = 0;\n  var Eel = new Float64Array(nelx*nely);\n  for (var e=0;e<Eel.length;e++) Eel[e] = Emin + Math.pow(x[e], penal)*(E0-Emin);\n  var diag = new Float64Array(ndof), ex, ey, i, j, ed, Ee;\n  for (ex=0;ex<nelx;ex++) for (ey=0;ey<nely;ey++){ e=ex*nely+ey; ed=edof[e]; Ee=Eel[e];\n    for (i=0;i<8;i++) diag[ed[i]] += Ee*KE[i][i]; }\n  var Minv = new Float64Array(ndof);\n  for (i=0;i<ndof;i++) Minv[i] = (free[i] && diag[i]!==0) ? 1/diag[i] : 0;\n  var ueT = new Float64Array(8);\n  function applyK(vec, out){\n    out.fill(0);\n    for (ex=0;ex<nelx;ex++) for (ey=0;ey<nely;ey++){ e=ex*nely+ey; ed=edof[e]; Ee=Eel[e];\n      for (i=0;i<8;i++) ueT[i]=vec[ed[i]];\n      for (i=0;i<8;i++){ var row=KE[i], s=0; for (j=0;j<8;j++) s+=row[j]*ueT[j]; out[ed[i]] += Ee*s; } }\n    for (i=0;i<ndof;i++) if (!free[i]) out[i]=0;\n  }\n  var r = new Float64Array(ndof); applyK(u, r);\n  for (i=0;i<ndof;i++) r[i] = (free[i]?F[i]:0) - r[i];\n  var z = new Float64Array(ndof); for (i=0;i<ndof;i++) z[i]=Minv[i]*r[i];\n  var p = Float64Array.from(z), Ap = new Float64Array(ndof), rz=0;\n  for (i=0;i<ndof;i++) rz += r[i]*z[i];\n  var Fnorm=0; for (i=0;i<ndof;i++) Fnorm += F[i]*F[i]; Fnorm = Math.max(1e-30, Math.sqrt(Fnorm));\n  for (var it=0; it<maxit; it++){\n    applyK(p, Ap);\n    var pAp=0; for (i=0;i<ndof;i++) pAp += p[i]*Ap[i]; if (pAp===0) break;\n    var alpha = rz/pAp;\n    for (i=0;i<ndof;i++){ u[i]+=alpha*p[i]; r[i]-=alpha*Ap[i]; }\n    var rnorm=0; for (i=0;i<ndof;i++) rnorm += r[i]*r[i];\n    if (Math.sqrt(rnorm)/Fnorm < tol) break;\n    for (i=0;i<ndof;i++) z[i]=Minv[i]*r[i];\n    var rzNew=0; for (i=0;i<ndof;i++) rzNew += r[i]*z[i];\n    var beta=rzNew/rz; rz=rzNew;\n    for (i=0;i<ndof;i++) p[i]=z[i]+beta*p[i];\n  }\n  return { u:u, Eel:Eel };\n}\nfunction buildFilter(nelx, nely, rmin){\n  var rows=[], r=Math.ceil(rmin)-1, ex, ey, fx, fy;\n  for (ex=0;ex<nelx;ex++) for (ey=0;ey<nely;ey++){\n    var nbr=[], wsum=0;\n    for (fx=Math.max(0,ex-r); fx<=Math.min(nelx-1,ex+r); fx++)\n      for (fy=Math.max(0,ey-r); fy<=Math.min(nely-1,ey+r); fy++){\n        var w = rmin - Math.hypot(ex-fx, ey-fy);\n        if (w>0){ nbr.push([fx*nely+fy, w]); wsum += w; }\n      }\n    rows.push({ nbr:nbr, wsum:wsum });\n  }\n  return rows;\n}\nfunction simpRun(params){\n  var nelx=params.nelx|0, nely=params.nely|0, volfrac=params.volfrac, penal=params.penal,\n      rmin=params.rmin, iters=params.iters|0, nu=(params.nu==null?0.3:params.nu);\n  var Emin=1e-9, E0=1.0, ne=nelx*nely, ndof=2*(nelx+1)*(nely+1);\n  var KE=elementK(nu), edof=new Array(ne), ex, ey, e, i, j;\n  for (ex=0;ex<nelx;ex++) for (ey=0;ey<nely;ey++) edof[ex*nely+ey]=edofOf(ex,ey,nely);\n  var F=new Float64Array(ndof), loadNode=nelx*(nely+1)+Math.floor(nely/2);\n  F[2*loadNode+1] = -1;\n  var fixed=[]; for (var iy=0; iy<=nely; iy++){ fixed.push(2*iy, 2*iy+1); }\n  var flt=buildFilter(nelx,nely,rmin), x=new Float64Array(ne).fill(volfrac), dc=new Float64Array(ne);\n  var compliance=0;\n  for (var loop=0; loop<iters; loop++){\n    var sol=solveCG(x,penal,KE,edof,ndof,F,fixed,Emin,E0,nelx,nely,1e-6,4000), u=sol.u, Eel=sol.Eel;\n    compliance=0; var ue=new Float64Array(8);\n    for (e=0;e<ne;e++){ var ed=edof[e];\n      for (i=0;i<8;i++) ue[i]=u[ed[i]];\n      var ueKue=0; for (i=0;i<8;i++){ var row=KE[i], s=0; for (j=0;j<8;j++) s+=row[j]*ue[j]; ueKue += ue[i]*s; }\n      compliance += Eel[e]*ueKue;\n      dc[e] = -penal*Math.pow(x[e],penal-1)*(E0-Emin)*ueKue;\n    }\n    var dcf=new Float64Array(ne);\n    for (e=0;e<ne;e++){ var fr=flt[e], s2=0; for (var t=0;t<fr.nbr.length;t++){ var f=fr.nbr[t][0], w=fr.nbr[t][1]; s2 += w*x[f]*dc[f]; }\n      dcf[e] = s2/(Math.max(1e-3,x[e])*fr.wsum); }\n    var l1=0, l2=1e9, move=0.2, xnew=new Float64Array(ne);\n    while ((l2-l1)/(l1+l2) > 1e-4){\n      var lmid=0.5*(l1+l2), vol=0;\n      for (e=0;e<ne;e++){ var be=Math.sqrt(Math.max(0,-dcf[e]/lmid)), xe=x[e]*be;\n        xe=Math.min(x[e]+move, Math.min(1, Math.max(x[e]-move, Math.max(0.001, xe)))); xnew[e]=xe; vol+=xe; }\n      if (vol > volfrac*ne) l1=lmid; else l2=lmid;\n    }\n    x=xnew;\n  }\n  return { nelx:nelx, nely:nely, x:x, compliance:compliance };\n}\n\n// The design sweep \u2014 also defines the gallery grid (cols x rows).\nconst VOLFRACS = [0.2, 0.35, 0.5, 0.65];\nconst RMINS = [1.4, 2.6];\n\nfunction run(lo, hi, chunk){\n  const cols = VOLFRACS.length, rows = RMINS.length;\n  const idx = (chunk && chunk.index) | 0;\n  if (idx >= cols * rows) return { kind: 'null' };\n  const gx = idx % cols, gy = (idx / cols) | 0;\n  const volfrac = VOLFRACS[gx], rmin = RMINS[gy];\n  const nelx = 40, nely = 20, penal = 3, iters = 28;\n  const r = simpRun({ nelx: nelx, nely: nely, volfrac: volfrac, penal: penal, rmin: rmin, iters: iters });\n  const rgba = new Array(nelx * nely * 4);\n  for (let ex = 0; ex < nelx; ex++) for (let ey = 0; ey < nely; ey++){\n    const v = Math.max(0, Math.min(255, Math.round(r.x[ex*nely+ey] * 255)));\n    const k = (ey*nelx + ex) * 4; rgba[k]=v; rgba[k+1]=v; rgba[k+2]=v; rgba[k+3]=255;\n  }\n  // Place this design in its gallery cell on the 640x480 output canvas.\n  const CW = 640, CH = 480, cellW = CW/cols, cellH = CH/rows, ox = gx*cellW, oy = gy*cellH;\n  const pad = 10, labelH = 24, boxW = cellW - 2*pad, boxH = cellH - 2*pad - labelH, ar = nelx/nely;\n  let dw = boxW, dh = dw/ar; if (dh > boxH){ dh = boxH; dw = dh*ar; }\n  const dx = ox + (cellW-dw)/2, dy = oy + pad + (boxH-dh)/2;\n  return { kind: 'tile', w: nelx, h: nely, rgba: rgba,\n    x: Math.round(dx), y: Math.round(dy), dw: Math.round(dw), dh: Math.round(dh),\n    bg: { x: Math.round(ox), y: Math.round(oy), w: Math.ceil(cellW), h: Math.ceil(cellH) },\n    caption: \"vol \" + volfrac + \" \u00b7 r \" + rmin, sub: \"C = \" + r.compliance.toFixed(1) };\n}\n",
+      "README.md": "# SIMP topology optimization \u2014 JavaScript kernel\n\nThe full structural optimizer, editable: matrix-free finite elements +\nOptimality-Criteria update + sensitivity filtering (the classic Sigmund 99-line\nmethod, ported to JS).\n\nEach chunk runs ONE complete optimization for a different design point.\n`VOLFRACS \u00d7 RMINS` defines the sweep AND the gallery grid; `OSIRIS.parts` must\nequal their product (here 4 \u00d7 2 = 8). `run(lo, hi, chunk)` reads `chunk.index`\nto pick its design point and returns a `tile` with `caption`/`sub` labels.\n\nEdit the sweep, the mesh (`nelx`/`nely`), or `penal`/`iters` \u2014 or fork the solver\nitself. It runs across the CPU cores of every device in the circle.\n" } },
+    "art-js": { files: {
+      "README.md": "# Distributed art (JavaScript)\nShows the GENERAL ABI: a kernel can return rich output, not just numbers. Each worker renders a horizontal band of a 640x480 image and returns {kind:'tile', x,y,w,h,rgba}; the host assembles the full picture on the output screen. Hit Build & run in circle — output kinds the host renders: number, log/text, tile, image, points, json.",
+      "run.js": "const OSIRIS = { parts: 48, label: \"Plasma art\" };\n// Distributed plasma art. Each chunk paints one horizontal band; the circle assembles the image.\nfunction run(lo, hi, chunk){\n  const W = 640, H = 480, parts = chunk.parts || 16, idx = chunk.index || 0;\n  const bandH = Math.ceil(H / parts), y0 = idx * bandH, y1 = Math.min(y0 + bandH, H);\n  if (y0 >= H) return { kind: 'null' };\n  const h = y1 - y0, rgba = new Array(W * h * 4);\n  for (let y = y0; y < y1; y++) for (let x = 0; x < W; x++){\n    const k = ((y - y0) * W + x) * 4;\n    const v = Math.sin(x*0.045) + Math.sin(y*0.05 + 1.7) + Math.sin((x+y)*0.03 + 3.1) + Math.sin(Math.hypot(x-320, y-240)*0.045);\n    rgba[k]   = Math.floor(128 + 127*Math.sin(v*1.7));\n    rgba[k+1] = Math.floor(128 + 127*Math.sin(v*1.7 + 2.1));\n    rgba[k+2] = Math.floor(128 + 127*Math.sin(v*1.7 + 4.2));\n    rgba[k+3] = 255;\n  }\n  return { kind: 'tile', x: 0, y: y0, w: W, h: h, rgba: rgba };\n}\n" } },
+    "primes-js": { files: {
+      "README.md": "# Prime counter (JavaScript)\nWrite run(lo,hi) in plain JS — it ships as source to every worker and runs directly. No compile step, runs now. (Simple TypeScript works too.) Note: JS runs with Web Worker privileges (can use fetch); for untrusted code prefer the WASM sandbox.",
+      "run.js": "const OSIRIS = { n: 1000000, parts: 48, label: \"Primes below N\" };\n// Count primes in [lo, hi). The circle sums over [0, N).\nfunction run(lo, hi){\n  let c = 0;\n  for (let i = Math.max(2, lo); i < hi; i++){\n    let p = true;\n    for (let j = 2; j*j <= i; j++){ if (i % j === 0){ p = false; break; } }\n    if (p) c++;\n  }\n  return c;\n}\n" } },
+    "hello-wat": { files: {
+      "README.md": "# Primes (WebAssembly text)\nHand-written WAT, compiles IN-BROWSER via wabt.js. Exports run(lo,hi) -> primes in [lo,hi), plus osiris_n/osiris_parts so the work size is declared in the script (no UI box).",
+      "main.wat": "(module\n  ;; run(lo, hi) -> count of primes in [lo, hi). Circle sums over [0, OSIRIS n).\n  (func (export \"run\") (param $lo i32) (param $hi i32) (result i32)\n    (local $i i32) (local $j i32) (local $c i32) (local $p i32)\n    (local.set $i (local.get $lo))\n    (block $end (loop $L\n      (br_if $end (i32.ge_s (local.get $i) (local.get $hi)))\n      (if (i32.lt_s (local.get $i) (i32.const 2)) (then) (else\n        (local.set $p (i32.const 1))\n        (local.set $j (i32.const 2))\n        (block $e2 (loop $L2\n          (br_if $e2 (i32.gt_s (i32.mul (local.get $j) (local.get $j)) (local.get $i)))\n          (if (i32.eqz (i32.rem_s (local.get $i) (local.get $j))) (then (local.set $p (i32.const 0)) (br $e2)))\n          (local.set $j (i32.add (local.get $j) (i32.const 1)))\n          (br $L2)))\n        (local.set $c (i32.add (local.get $c) (local.get $p)))))\n      (local.set $i (i32.add (local.get $i) (i32.const 1)))\n      (br $L)))\n    (local.get $c))\n  (func (export \"osiris_n\") (result i32) (i32.const 1000000))\n  (func (export \"osiris_parts\") (result i32) (i32.const 48)))" } }
+  };
+
+  const lab = {
+    projects:null, cur:null, file:null, _t:0,
+    load(){
+      try { this.projects = JSON.parse(localStorage.getItem("osiris.lab") || "null"); } catch(e){ this.projects = null; }
+      const v = parseInt(localStorage.getItem("osiris.lab.v") || "0", 10);
+      if (!this.projects || !Object.keys(this.projects).length){ this.projects = JSON.parse(JSON.stringify(DEMO_PROJECTS)); }
+      else if (v < DEMO_VERSION){
+        const OLD = ["primes-c","primes-rust","primes-go","primes-assemblyscript","primes-python","primes-js","hello-wat"];
+        for (const k of OLD){ if (!DEMO_PROJECTS[k] && this.projects[k]) delete this.projects[k]; }
+        for (const k of Object.keys(DEMO_PROJECTS)) this.projects[k] = JSON.parse(JSON.stringify(DEMO_PROJECTS[k]));
+        log($("labLog"),"demo projects refreshed to v"+DEMO_VERSION);
+      }
+      try { localStorage.setItem("osiris.lab.v", String(DEMO_VERSION)); } catch(e){}
+      this.save();
+      this.cur = Object.keys(this.projects)[0];
+      this.file = Object.keys(this.projects[this.cur].files)[0] || null;
+      this.renderProjects(); this.renderFiles(); this.open(this.file);
+    },
+    save(){ try { localStorage.setItem("osiris.lab", JSON.stringify(this.projects)); } catch(e){ if ($("labLog")) log($("labLog"),"save failed (storage full?)"); } },
+    renderProjects(){
+      const el=$("projPick"); if(!el) return; el.innerHTML="";
+      for (const name of Object.keys(this.projects)){
+        const b=document.createElement("button"); b.className="chip"+(name===this.cur?" active":""); b.textContent=name;
+        b.onclick=()=>{ this.saveCurrent(); this.cur=name; this.file=Object.keys(this.projects[name].files)[0]||null; this.renderProjects(); this.renderFiles(); this.open(this.file); };
+        el.appendChild(b);
+      }
+    },
+    renderFiles(){
+      const el=$("fileList"); if(!el) return; el.innerHTML="";
+      const files=this.projects[this.cur].files;
+      for (const name of Object.keys(files)){
+        const d=document.createElement("div"); d.className="f"+(name===this.file?" active":""); d.textContent=name;
+        d.onclick=()=>{ this.saveCurrent(); this.open(name); };
+        el.appendChild(d);
+      }
+    },
+    open(name){
+      this.file=name; const files=this.projects[this.cur].files;
+      $("editor").value = name ? (files[name] || "") : "";
+      $("curFile").textContent = name ? (this.cur+" / "+name) : "";
+      const _ext=(name?(name.split(".").pop()||""):"").toLowerCase();
+      $("labLang").textContent = name ? ("· "+langOf(name)+(_ext==="wgsl"?" — runs on your GPU":(CLIENT_COMPILE[_ext]?" — builds in-browser":""))) : "";
+      this.renderFiles();
+    },
+    saveCurrent(){ if (this.cur && this.file){ this.projects[this.cur].files[this.file] = $("editor").value; this.save(); } },
+    onEdit(){ clearTimeout(this._t); this._t=setTimeout(()=>this.saveCurrent(), 400); },
+    newFile(){ const nm=(prompt("file name (e.g. kernel.rs)")||"").trim(); if(!nm) return; this.projects[this.cur].files[nm]=""; this.save(); this.open(nm); },
+    delFile(){ if(!this.file) return; if(!confirm("delete "+this.file+"?")) return; delete this.projects[this.cur].files[this.file]; const k=Object.keys(this.projects[this.cur].files); this.file=k[0]||null; this.save(); this.open(this.file); },
+    newProject(){ const nm=(prompt("new project name")||"").trim(); if(!nm) return; if(this.projects[nm]){ alert("exists"); return; } this.projects[nm]={files:{"README.md":"# "+nm+"\n"}}; this.cur=nm; this.file="README.md"; this.save(); this.renderProjects(); this.open(this.file); },
+    upload(fileList){
+      const files=this.projects[this.cur].files; let pending=fileList.length;
+      for (const file of fileList){
+        const rd=new FileReader();
+        const isBin = /\.(wasm|bin|png|jpg|jpeg|gif|wasm)$/i.test(file.name);
+        rd.onload=()=>{ files[file.name]= isBin ? ("base64:"+btoa(String.fromCharCode.apply(null, new Uint8Array(rd.result)))) : rd.result;
+          if(--pending===0){ this.save(); this.renderFiles(); this.open(file.name); log($("labLog"),"uploaded "+fileList.length+" file(s)"); } };
+        if (isBin) rd.readAsArrayBuffer(file); else rd.readAsText(file);
+      }
+    }
+  };
+
+  // =========================================================================
+  // LIVE SCENE — interactive particle field the host renders + streams as video
+  // =========================================================================
+  const scene = {
+    parts:[], wells:new Map(), raf:0, live:false, stream:null, track:null,
+    init(){ const c=$("scene"); this.parts=[]; for (let i=0;i<170;i++) this.parts.push({x:Math.random()*c.width, y:Math.random()*c.height, vx:0, vy:0}); },
+    start(){ if (this.raf || !$("scene")) return; this.init(); const loop=()=>{ this.step(); this.raf=requestAnimationFrame(loop); }; this.raf=requestAnimationFrame(loop); },
+    step(){
+      const c=$("scene"), ctx=c.getContext("2d");
+      ctx.fillStyle="rgba(11,11,12,0.28)"; ctx.fillRect(0,0,c.width,c.height);
+      const wells=[...this.wells.values()];
+      for (const p of this.parts){
+        for (const w of wells){ const dx=w.x-p.x, dy=w.y-p.y, d2=dx*dx+dy*dy+500, f=160/d2; p.vx+=f*dx; p.vy+=f*dy; }
+        p.vx*=0.95; p.vy*=0.95; p.x+=p.vx; p.y+=p.vy;
+        if (p.x<0||p.x>c.width) p.vx*=-0.6; if (p.y<0||p.y>c.height) p.vy*=-0.6;
+        p.x=Math.max(0,Math.min(c.width,p.x)); p.y=Math.max(0,Math.min(c.height,p.y));
+        const sp=Math.min(1, Math.hypot(p.vx,p.vy)/6);
+        ctx.fillStyle="rgba("+Math.round(120+135*sp)+","+Math.round(150+60*(1-sp))+",240,0.9)";
+        ctx.fillRect(p.x,p.y,2.4,2.4);
+      }
+      ctx.fillStyle="rgba(241,241,239,0.55)";
+      for (const w of wells){ ctx.beginPath(); ctx.arc(w.x,w.y,5,0,7); ctx.fill(); }
+    }
+  };
+
+  // =========================================================================
+  // HOST
+  // =========================================================================
+  const host = {
+    peers:new Map(), chunks:[], pending:[], done:0, startTime:0, spectate:true, _specTimer:null, specLabel:"",
+    hostInflight:0, hostSlots:HW, tStart:new Map(),
+    moduleId:null, userN:1000000, userSum:0, userLabel:"module",
+    usage:new Map(), specs:new Map(), epoch:0, taskName:"userwasm",
+
+    onPeerJoined(peerId){
+      log($("hostLog"), "peer "+peerId.slice(0,6)+" joined — sending offer");
+      const pc=new RTCPeerConnection(ICE), channel=pc.createDataChannel("compute",{ordered:true});
+      channel.binaryType="arraybuffer";
+      const peer={pc,channel,q:makeIceQueue(pc),inflight:0,inflightSet:new Set(),slots:2,moduleReady:new Set()};
+      peer.id=peerId; this.peers.set(peerId, peer);
+      pc.onicecandidate=e=>{ if (e.candidate) sig({type:"signal",to:peerId,data:{candidate:e.candidate}}); };
+      pc.oniceconnectionstatechange=()=>{ log($("hostLog"),"peer "+peerId.slice(0,6)+" ICE: "+pc.iceConnectionState);
+        if (["failed","disconnected","closed"].includes(pc.iceConnectionState)) this.onPeerLeft(peerId); };
+      channel.onopen=()=>{ log($("hostLog"),"peer "+peerId.slice(0,6)+" LINKED (P2P data channel open)"); this.refreshDevices(); this.pump(); if (scene.live) this.addStreamTo(peerId, peer); };
+      channel.onclose=()=>{ this.refreshDevices(); };
+      channel.onmessage=e=>{ if (typeof e.data==="string") this.onControl(peerId, e.data); else this.onResult(peerId, e.data); };
+      pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>sig({type:"signal",to:peerId,data:{sdp:pc.localDescription}}))
+        .catch(err=>log($("hostLog"),"offer error: "+err.message));
+      this.updatePeerCount();
+    },
+    async onSignalData(peerId, data){
+      const peer=this.peers.get(peerId); if (!peer) return;
+      if (data.sdp){ await peer.pc.setRemoteDescription(data.sdp); await peer.q.ready(); }
+      else if (data.candidate){ await peer.q.add(data.candidate); }
+    },
+    onPeerLeft(peerId){
+      const peer=this.peers.get(peerId); if (!peer) return;
+      for (const cid of (peer.inflightSet||[])) if (this.chunks[cid] && !this.chunks[cid].__done) this.pending.unshift(cid);
+      try{ peer.pc.close(); }catch(e){}
+      const leftName=peer.name||("guest-"+peerId.slice(0,4));
+      scene.wells.delete(peerId); this.peers.delete(peerId); log($("hostLog"),"peer "+peerId.slice(0,6)+" left");
+      this.updatePeerCount(); this.refreshDevices(); this.broadcastRoster(); chatAppend(null, leftName+" left", false, true); this.pump();
+    },
+    updatePeerCount(){ $("peerCount").textContent=this.peers.size; },
+    refreshDevices(){ let n=1; for (const p of this.peers.values()) if (p.channel&&p.channel.readyState==="open") n++; $("sDevices").textContent=n; },
+
+    startRun(taskName){
+      this.taskName=taskName; this.epoch=(this.epoch||0)+1;
+      const task=TASKS[taskName]; task.reset();
+      this.chunks=task.makeChunks(); this.pending=this.chunks.map((_,i)=>i); this.done=0;
+      this.usage=new Map();
+      for (const peer of this.peers.values()){ peer.inflight=0; peer.inflightSet=new Set(); }
+      this.hostInflight=0; this.tStart=new Map(); this.renderUsage();
+      this.startTime=performance.now();
+      $("progBar").style.width="0%"; $("sChunks").textContent="0/"+this.chunks.length; $("sElapsed").textContent="—";
+      log($("hostLog"), "running "+task.label+" — "+this.chunks.length+" chunks across "+$("sDevices").textContent+" device(s)");
+      requestWakeLock(); this.startSpectate(); this.pump();
+    },
+    pump(){
+      for (const [peerId,peer] of this.peers){
+        if (!peer.channel || peer.channel.readyState!=="open") continue;
+        if ((this.taskName==="userwasm"||this.taskName==="userwgsl") && !(peer.moduleReady && peer.moduleReady.has(this.moduleId))) continue;
+        while (peer.inflight < (peer.slots||2) && this.pending.length) this.dispatch(peer);
+      }
+      while (this.hostInflight < this.hostSlots && this.pending.length) this.localCompute();
+    },
+    dispatch(peer){
+      const cid=this.pending.shift(); peer.inflight++; peer.inflightSet.add(cid); this.tStart.set(cid, performance.now());
+      peer.channel.send(JSON.stringify({cmd:"work", task:this.taskName, epoch:this.epoch, chunkId:cid, chunk:this.chunks[cid]}));
+    },
+    localCompute(){
+      const cid=this.pending.shift(); if (cid==null) return;
+      this.hostInflight++; const ep=this.epoch; this.tStart.set(cid, performance.now()); const chunk=this.chunks[cid];
+      runKernel(this.taskName, ep, cid, chunk).then(buf=>{
+        this.hostInflight=Math.max(0,this.hostInflight-1); if (ep!==this.epoch) return;
+        const ms=performance.now()-(this.tStart.get(cid)||performance.now());
+        this.integrateResult("self","this device (host)", cid, buf, ms); this.pump();
+      });
+    },
+    onResult(peerId, buf){
+      const dv=new DataView(buf); if (dv.getUint32(0,true)!==(this.epoch>>>0)) return;
+      const cid=dv.getUint32(4,true), peer=this.peers.get(peerId); let ms=0;
+      if (peer){ peer.inflight=Math.max(0,peer.inflight-1); peer.inflightSet.delete(cid); ms=performance.now()-(this.tStart.get(cid)||performance.now()); }
+      this.integrateResult(peerId, "peer "+peerId.slice(0,6), cid, buf, ms); this.pump();
+    },
+    integrateResult(deviceId, label, cid, buf, ms){
+      const bytes=new Uint8Array(buf, 8);
+      try { TASKS[this.taskName].integrate(cid, this.chunks[cid], bytes); } catch(e){ log($("hostLog"),"integrate error: "+e.message); }
+      this.recordUsage(deviceId, label, ms); this.completeOne(cid);
+    },
+    completeOne(cid){
+      const t=this.chunks[cid]; if (!t || t.__done) return; t.__done=true; this.done++;
+      $("sChunks").textContent=this.done+"/"+this.chunks.length;
+      $("progBar").style.width=(100*this.done/this.chunks.length).toFixed(1)+"%";
+      const el=(performance.now()-this.startTime)/1000; $("sElapsed").textContent=el.toFixed(1)+"s";
+      if (this.done===this.chunks.length){
+        log($("hostLog"), TASKS[this.taskName].label+" complete in "+el.toFixed(2)+"s across "+$("sDevices").textContent+" device(s)");
+        const devices=[...this.usage.entries()].map(([id,d])=>({id, label:d.label, chunks:d.n, avgMs:Math.round(d.ms/d.n), specs:this.specs.get(id)||null}));
+        devices.forEach(d=>log($("hostLog"),"  · "+d.label+": "+d.chunks+" chunks, avg "+d.avgMs+"ms"));
+        try { sig({type:"report", task:this.taskName, elapsedSec:+el.toFixed(2), devices}); } catch(e){}
+        this.sendFrame(); this.stopSpectate();
+      }
+    },
+    onControl(peerId, raw){
+      let m; try{ m=JSON.parse(raw); }catch(e){ return; }
+      const peer=this.peers.get(peerId);
+      if (m.cmd==="hello"){
+        if (peer){ peer.specs=m.specs; peer.name=m.name||("guest-"+peerId.slice(0,4)); }
+        if (peer) peer.slots = Math.max(1, Math.min(8, (m.specs&&m.specs.cores)||2));
+        this.specs.set(peerId, m.specs);
+        log($("hostLog"),"peer "+peerId.slice(0,6)+" specs: "+specSummary(m.specs));
+        this.renderUsage(); this.broadcastRoster(); this.pump();
+        if (peer && !peer.announced){ peer.announced=true; chatAppend(null, peer.name+" joined", false, true); }
+      } else if (m.cmd==="chat"){
+        chatAppend(m.name, m.text, false, false);
+        for (const [id,p] of this.peers){ if (id!==peerId && p.channel && p.channel.readyState==="open"){ try{ p.channel.send(raw); }catch(e){} } }
+      } else if (m.cmd==="input"){
+        const c=$("scene"); scene.wells.set(peerId, { x:m.x*c.width, y:m.y*c.height });
+      } else if (m.cmd==="module-ready"){
+        if (peer){ peer.moduleReady=peer.moduleReady||new Set(); peer.moduleReady.add(m.moduleId); }
+        log($("hostLog"),"peer "+peerId.slice(0,6)+" ready: module "+m.moduleId); this.pump();
+      } else if (m.cmd==="shard-ready"){ models.onShardReady();
+      } else if (m.cmd==="shard-out"){ models.onShardOut(m);
+      }
+    },
+    goLive(){
+      scene.start();
+      try { scene.stream = $("scene").captureStream(30); } catch(e){ log($("sceneLog"),"capture error: "+e.message); return; }
+      scene.track = scene.stream.getVideoTracks()[0]; scene.live = true;
+      for (const [id,peer] of this.peers) this.addStreamTo(id, peer);
+      log($("sceneLog"), "LIVE — streaming scene to "+this.peers.size+" device(s)");
+      $("liveBtn").textContent="Stop streaming";
+    },
+    stopLive(){
+      scene.live=false; if (scene.track) try{ scene.track.stop(); }catch(e){}
+      for (const peer of this.peers.values()) peer._hasTrack=false;
+      log($("sceneLog"),"stopped streaming"); $("liveBtn").textContent="Go live";
+    },
+    addStreamTo(peerId, peer){
+      if (!scene.track || peer._hasTrack) return;
+      try { peer.pc.addTrack(scene.track, scene.stream); peer._hasTrack=true; this.renegotiate(peerId, peer); }
+      catch(e){ log($("sceneLog"),"addTrack error: "+e.message); }
+    },
+    renegotiate(peerId, peer){
+      peer.pc.createOffer().then(o=>peer.pc.setLocalDescription(o))
+        .then(()=>sig({type:"signal", to:peerId, data:{sdp:peer.pc.localDescription}}))
+        .catch(e=>log($("sceneLog"),"renegotiate error: "+e.message));
+    },
+    async runModule(payload, label, lang){
+      lang = lang || "wasm";
+      if (lang==="wgsl"){
+        const moduleId = hashStr(payload); this.moduleId=moduleId; this.moduleLang="wgsl";
+        log($("labLog"),"compiling WGSL kernel "+moduleId+" for this device's GPU…");
+        let cfg;
+        try { cfg = await loadWGSLModule(moduleId, payload); }
+        catch(e){ log($("labLog"),"WGSL error: "+e.message+" — a GPU node must host this kernel."); return; }
+        this.wgslCfg = cfg;
+        this.userParts = (cfg.parts!=null ? cfg.parts : Math.max(8,(this.hostSlots||8)*4))|0;
+        this.userN = ((cfg.W||640)*(cfg.H||480))|0;
+        this.userLabel = cfg.label || label || "WGSL kernel";
+        const msg = {cmd:"load-module", moduleId, lang:"wgsl", src:payload};
+        const need=[];
+        for (const [id,peer] of this.peers){ if (!(peer.channel && peer.channel.readyState==="open")) continue; peer.moduleReady=peer.moduleReady||new Set(); if (!peer.moduleReady.has(moduleId)){ try{ peer.channel.send(JSON.stringify(msg)); need.push(peer); }catch(e){} } }
+        if (need.length){ log($("labLog"),"sent WGSL to "+need.length+" peer(s) — waiting for GPU compile…"); await this.waitReady(moduleId, need, 5000); }
+        const ready=[...this.peers.values()].filter(p=>p.channel && p.channel.readyState==="open" && p.moduleReady && p.moduleReady.has(moduleId)).length;
+        log($("labLog"),"running '"+this.userLabel+"' on this GPU + "+ready+" peer GPU(s)…");
+        this.startRun("userwgsl"); return;
+      }
+      const moduleId = (lang==="js") ? hashStr(payload) : hashBytes(payload);
+      this.moduleId=moduleId; this.moduleLang=lang;
+      log($("labLog"),"loading "+lang+" module "+moduleId+" into "+HW+" local core(s)…");
+      const cfg = (await poolLoadModule(moduleId, lang, payload)) || {};
+      this.userParts = (cfg.parts!=null ? cfg.parts : Math.min(256, Math.max(16,(this.hostSlots||8)*4)))|0;
+      this.userN = (cfg.n!=null ? cfg.n : this.userParts)|0;
+      this.userLabel = cfg.label || label || "module";
+      const msg = (lang==="js") ? {cmd:"load-module", moduleId, lang:"js", src:payload} : {cmd:"load-module", moduleId, lang:"wasm", b64:abToB64(payload)};
+      const need=[];
+      for (const [id,peer] of this.peers){
+        if (!(peer.channel && peer.channel.readyState==="open")) continue;
+        peer.moduleReady = peer.moduleReady || new Set();
+        if (!peer.moduleReady.has(moduleId)){ try{ peer.channel.send(JSON.stringify(msg)); need.push(peer); }catch(e){} }
+      }
+      if (need.length){
+        log($("labLog"),"sent module to "+need.length+" peer(s) — waiting for them to load before dispatching…");
+        await this.waitReady(moduleId, need, 5000);
+      }
+      const ready = [...this.peers.values()].filter(p=>p.channel && p.channel.readyState==="open" && p.moduleReady && p.moduleReady.has(moduleId)).length;
+      log($("labLog"),"running across this device + "+ready+" ready peer(s) over [0,"+this.userN+")…");
+      this.startRun("userwasm");
+    },
+    waitReady(moduleId, peers, timeoutMs){
+      return new Promise(resolve=>{
+        const t0=performance.now();
+        const tick=()=>{ if (peers.every(p=>p.moduleReady && p.moduleReady.has(moduleId)) || (performance.now()-t0)>timeoutMs) resolve(); else setTimeout(tick, 60); };
+        tick();
+      });
+    },
+    rosterList(){
+      const list=[{id:"self", name:myName, host:true}];
+      for (const [id,p] of this.peers) if (p.channel && p.channel.readyState==="open") list.push({id, name:p.name||("guest-"+id.slice(0,4))});
+      return list;
+    },
+    broadcastToPeers(obj){ const sObj=JSON.stringify(obj); for (const p of this.peers.values()){ if (p.channel && p.channel.readyState==="open"){ try{ p.channel.send(sObj); }catch(e){} } } },
+    startSpectate(){
+      this.stopSpectate();
+      this.specLabel = this.userLabel || ((TASKS[this.taskName]&&TASKS[this.taskName].label)||"job");
+      if (!this.spectate) return;
+      if (![...this.peers.values()].some(p=>p.channel && p.channel.readyState==="open")) return;
+      this.broadcastToPeers({ cmd:"job-begin", label:this.specLabel });
+      this._specTimer = setInterval(()=>this.sendFrame(), 150);
+    },
+    sendFrame(){
+      if (!this.spectate) return;
+      const cv=$("canvas"); if (!cv) return;
+      let img="";
+      try { const maxW=320, w=maxW, h=Math.max(1, Math.round(cv.height*(maxW/cv.width)));
+        const off=document.createElement("canvas"); off.width=w; off.height=h; off.getContext("2d").drawImage(cv, 0, 0, w, h);
+        img=off.toDataURL("image/jpeg", 0.6);
+      } catch(e){ return; }
+      const out = $("jobOut") ? $("jobOut").innerText.slice(-1500) : "";
+      this.broadcastToPeers({ cmd:"spectate-frame", img:img, out:out, label:this.specLabel });
+    },
+    stopSpectate(){ if (this._specTimer){ clearInterval(this._specTimer); this._specTimer=null; } },
+    broadcastRoster(){
+      const list=this.rosterList(), msg=JSON.stringify({cmd:"roster", roster:list});
+      for (const p of this.peers.values()) if (p.channel && p.channel.readyState==="open"){ try{ p.channel.send(msg); }catch(e){} }
+      renderPresence(list);
+    },
+    recordUsage(id, label, ms){ let d=this.usage.get(id); if (!d){ d={label,n:0,ms:0}; this.usage.set(id,d); } d.n++; d.ms+=ms; this.renderUsage(); },
+    renderUsage(){
+      const u=$("usage"); if (!u) return;
+      let html="<div style=\"color:var(--ink-soft)\">Per-device</div>";
+      const ids=new Set([...this.specs.keys(), ...this.usage.keys()]);
+      for (const id of ids){
+        const d=this.usage.get(id), label=(d&&d.label)||(id==="self"?"this device (host)":"peer "+String(id).slice(0,6));
+        const used=d?(d.n+" chunks · avg "+Math.round(d.ms/d.n)+"ms/chunk"):"idle";
+        html+="<div>"+label+" — <span style=\"color:var(--ink-soft)\">"+specSummary(this.specs.get(id))+"</span></div>";
+        html+="<div style=\"padding-left:12px\">"+used+"</div>";
+      }
+      u.innerHTML=html;
+    }
+  };
+
+  // =========================================================================
+  // WORKER (peer)
+  // =========================================================================
+  const worker = {
+    pc:null, channel:null, q:null, hostId:null, n:0,
+    setStatus(t,c){ $("wStatus").textContent=t; $("wDot").className="dot"+(c?(" "+c):""); },
+    onJoined(m){
+      this.hostId=m.hostId; $("wRoomCode").textContent=m.roomId;
+      this.setStatus("joined — waiting for host offer","warn"); log($("workerLog"),"joined room "+m.roomId+" — waiting for host offer");
+      this.pc=new RTCPeerConnection(ICE); this.q=makeIceQueue(this.pc);
+      this.pc.onicecandidate=e=>{ if (e.candidate) sig({type:"signal",to:this.hostId,data:{candidate:e.candidate}}); };
+      this.pc.oniceconnectionstatechange=()=>{ const s=this.pc.iceConnectionState; $("wLink").textContent=s; log($("workerLog"),"ICE: "+s);
+        if (s==="connected"||s==="completed") this.setStatus("computing","on");
+        else if (s==="failed") this.setStatus("connection failed — see note below","bad");
+        else if (s==="disconnected") this.setStatus("link dropped","bad");
+        else this.setStatus(s,"warn"); };
+      this.pc.ontrack=ev=>{ $("streamStage").classList.remove("hidden"); $("streamVid").srcObject=ev.streams[0]; log($("workerLog"),"receiving live scene from host"); };
+      this.pc.ondatachannel=ev=>{
+        this.channel=ev.channel; this.channel.binaryType="arraybuffer";
+        this.channel.onopen=()=>{ this.setStatus("computing","on"); log($("workerLog"),"data channel OPEN — contributing compute");
+          requestWakeLock(); try{ this.channel.send(JSON.stringify({cmd:"hello", specs:deviceSpecs(), name:myName})); }catch(e){} };
+        this.channel.onmessage=e=>this.onTask(e.data);
+      };
+    },
+    async onSignalData(data){
+      if (data.sdp){ log($("workerLog"),"received host "+(data.sdp.type||"sdp")+" — answering");
+        await this.pc.setRemoteDescription(data.sdp); await this.q.ready();
+        const ans=await this.pc.createAnswer(); await this.pc.setLocalDescription(ans);
+        sig({type:"signal",to:this.hostId,data:{sdp:this.pc.localDescription}}); this.setStatus("negotiating…","warn");
+      } else if (data.candidate){ await this.q.add(data.candidate); }
+    },
+    onTask(raw){
+      let m; try{ m=JSON.parse(raw); }catch(e){ return; }
+      if (m.cmd==="shard-assign"){ models.onAssign(m); return; }
+      if (m.cmd==="shard-fwd"){ models.onFwd(m); return; }
+      if (m.cmd==="work"){ runKernel(m.task, m.epoch, m.chunkId, m.chunk).then(buf=>{ try{ this.channel.send(buf); }catch(e){} this.n++; $("wTiles").textContent=this.n; }); return; }
+      if (m.cmd==="chat"){ chatAppend(m.name, m.text, false, false); return; }
+      if (m.cmd==="roster"){ renderPresence(m.roster); return; }
+      if (m.cmd==="job-begin"){ $("wOutStage").classList.remove("hidden");
+        const cv=$("wCanvas"); if(cv){ const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height); x.fillStyle="#cfcfca"; x.font="15px 'IBM Plex Mono', monospace"; x.textAlign="center"; x.fillText("the circle is computing "+(m.label||"a job")+"…", cv.width/2, cv.height/2); }
+        if ($("wOut")) $("wOut").textContent=""; return; }
+      if (m.cmd==="spectate-frame"){ $("wOutStage").classList.remove("hidden");
+        const cv=$("wCanvas"); if(cv && m.img){ const im=new Image(); im.onload=()=>{ const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height); try{ x.drawImage(im,0,0,cv.width,cv.height); }catch(e){} }; im.src=m.img; }
+        if (m.out!=null && $("wOut")) $("wOut").textContent=m.out; return; }
+      if (m.cmd==="load-module"){
+        if (m.lang==="wgsl"){
+          loadWGSLModule(m.moduleId, m.src).then(()=>{ try{ this.channel.send(JSON.stringify({cmd:"module-ready", moduleId:m.moduleId})); }catch(e){} log($("workerLog"),"compiled WGSL "+m.moduleId+" for local GPU"); })
+            .catch(e=>{ log($("workerLog"),"WGSL compile skipped (no GPU?): "+e.message); });
+          return;
+        }
+        const payload=(m.lang==="js")?m.src:b64ToU8(m.b64);
+        poolLoadModule(m.moduleId, m.lang||"wasm", payload).then(()=>{ try{ this.channel.send(JSON.stringify({cmd:"module-ready", moduleId:m.moduleId})); }catch(e){} log($("workerLog"),"loaded module "+m.moduleId+" into local cores"); });
+        return;
+      }
+    },
+    onHostLeft(){ this.setStatus("host left","bad"); log($("workerLog"),"host closed the circle"); }
+  };
+
+  function onSignal(m){ if (role==="host") host.onSignalData(m.from, m.data); else if (role==="worker") worker.onSignalData(m.data); }
+  function onCreated(m){
+    role="host"; selfId=m.selfId; roomId=m.roomId;
+    $("landing").classList.add("hidden"); $("hostView").classList.remove("hidden");
+    $("roomCode").textContent=m.roomId; $("shareLink").value="https://"+location.host+"/?room="+m.roomId;
+    host.specs.set("self", deviceSpecs()); host.renderUsage();
+    log($("hostLog"),"circle opened — code "+m.roomId); log($("hostLog"),"this device: "+specSummary(host.specs.get("self")));
+    $("chat").classList.remove("hidden"); $("chatName").value=myName; renderPresence(host.rosterList());
+    $("sEngine").textContent="detecting…"; gpu().then(g=>{ $("sEngine").textContent=(g?"WebGPU":"CPU")+" · "+HW+(HW>1?" workers":" worker"); });
+    scene.start(); lab.load();
+  }
+  function onJoined(m){ role="worker"; selfId=m.selfId; roomId=m.roomId; OUT={cv:"wCanvas", out:"wOut"};
+    $("landing").classList.add("hidden"); $("workerView").classList.remove("hidden"); $("chat").classList.remove("hidden"); $("chatName").value=myName; worker.onJoined(m); }
+  function doJoin(code){ sig({type:"join", roomId:String(code).toUpperCase().trim()}); }
+
+  // =======================================================================
+  // MODELS — pipeline-parallel inference, folded into the circle.
+  // Reuses the peer data channels; coordination rides onControl/onTask JSON.
+  // Demo: distilgpt2 sharded FRONT(embed+0-1) | MID(2-3, a peer) | BACK(4-5+head).
+  // =======================================================================
+  let _ortP=null;
+  function loadORT(){ if(!_ortP){ _ortP=new Promise((res,rej)=>{ const sc=document.createElement("script");
+    sc.src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.js";
+    sc.onload=()=>{ try{ ort.env.wasm.numThreads=1; ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/"; }catch(e){} res(window.ort); };
+    sc.onerror=()=>rej(new Error("onnxruntime-web load failed")); document.head.appendChild(sc); }); } return _ortP; }
+
+  // model registry — adding a model is a config entry (+ its shard files under base)
+  const MODELS = {
+    mistral7b: { id:"mistral7b", name:"Mistral-7B-Instruct-v0.3 — distributed", base:"/models/mistral7b/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"/model/layers.4/Add_1_output_0", seamM:"/model/layers.26/Add_1_output_0",
+      kvFront:[0,5], kvBack:[27,32], kvHeads:8, headDim:128,
+      midStages:[
+        {file:"qMID0.onnx", kv:[5,8], seamIn:"/model/layers.4/Add_1_output_0", seamOut:"/model/layers.7/Add_1_output_0"},
+        {file:"qMID1.onnx", kv:[8,12], seamIn:"/model/layers.7/Add_1_output_0", seamOut:"/model/layers.11/Add_1_output_0"},
+        {file:"qMID2.onnx", kv:[12,16], seamIn:"/model/layers.11/Add_1_output_0", seamOut:"/model/layers.15/Add_1_output_0"},
+        {file:"qMID3.onnx", kv:[16,19], seamIn:"/model/layers.15/Add_1_output_0", seamOut:"/model/layers.18/Add_1_output_0"},
+        {file:"qMID4.onnx", kv:[19,23], seamIn:"/model/layers.18/Add_1_output_0", seamOut:"/model/layers.22/Add_1_output_0"},
+        {file:"qMID5.onnx", kv:[23,27], seamIn:"/model/layers.22/Add_1_output_0", seamOut:"/model/layers.26/Add_1_output_0"}
+      ],
+      chat:true, stop:2, chatTemplate:"<s>[INST] {user} [/INST]", defaultPrompt:"Write a haiku about distributed computing.", defTemp:0.3, ep:["webgpu"], memPattern:false },
+    qwen3b: { id:"qwen3b", name:"Qwen2.5-Coder-3B-Instruct (fp32, 2-tensor seam)", base:"/models/qwen3b/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:["/model/layers.5/post_attention_layernorm/output_3","/model/layers.5/mlp/down_proj/MatMul/output_0"], seamM:["/model/layers.18/post_attention_layernorm/output_3","/model/layers.18/mlp/down_proj/MatMul/output_0"],
+      kvFront:[0,6], kvBack:[19,36], kvHeads:2, headDim:128,
+      midStages:[{file:"qMID.onnx", kv:[6,19], seamIn:["/model/layers.5/post_attention_layernorm/output_3","/model/layers.5/mlp/down_proj/MatMul/output_0"], seamOut:["/model/layers.18/post_attention_layernorm/output_3","/model/layers.18/mlp/down_proj/MatMul/output_0"]}],
+      chat:true, stop:151645, memPattern:false, chatTemplate:null, defaultPrompt:"Write a Python function to reverse a string.", defTemp:0.3, ep:["webgpu"] },
+    qwen15n: { id:"qwen15n", name:"Qwen2.5-1.5B — 3-device chain (2 stages)", base:"/models/qwen15/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"/model/layers.13/Add_1_output_0", seamM:"/model/layers.16/Add_1_output_0",
+      kvFront:[0,14], kvBack:[17,28], kvHeads:2, headDim:128,
+      midStages:[
+        {file:"qMID0.onnx", kv:[14,16], seamIn:"/model/layers.13/Add_1_output_0", seamOut:"/model/layers.15/Add_1_output_0"},
+        {file:"qMID1.onnx", kv:[16,17], seamIn:"/model/layers.15/Add_1_output_0", seamOut:"/model/layers.16/Add_1_output_0"}
+      ],
+      chat:true, stop:151645, chatTemplate:null, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"] },
+    qwen15: { id:"qwen15", name:"Qwen2.5-1.5B-Instruct", base:"/models/qwen15/",
+      files:{front:"qFRONT.onnx", mid:"qMID.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"/model/layers.13/Add_1_output_0", seamM:"/model/layers.16/Add_1_output_0",
+      kvFront:[0,14], kvMid:[14,17], kvBack:[17,28], kvHeads:2, headDim:128,
+      chat:true, stop:151645, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"] },
+    qwen: { id:"qwen", name:"Qwen2.5-0.5B-Instruct", base:"/models/qwen/",
+      files:{front:"qFRONT.onnx?v=4", mid:"qMID.onnx?v=4", back:"qBACK.onnx?v=4", tok:"tokenizer.json"},
+      seamF:"/model/layers.10/Add_1_output_0", seamM:"/model/layers.12/Add_1_output_0",
+      kvFront:[0,11], kvMid:[11,13], kvBack:[13,24], kvHeads:2, headDim:64,
+      chat:true, stop:151645, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"] },
+    distilgpt2: { id:"distilgpt2", name:"distilgpt2 (82M)", base:"/models/",
+      files:{front:"stage_FRONT.onnx", mid:"stage_MID.onnx", back:"stage_BACK.onnx", tok:"tokenizer.json"},
+      seamF:"/transformer/h.1/Add_1_output_0", seamM:"/transformer/h.3/Add_1_output_0",
+      kvFront:[0,2], kvMid:[2,4], kvBack:[4,6], kvHeads:12, headDim:64,
+      chat:false, stop:null, defaultPrompt:"The future of distributed computing is", defTemp:0.8, ep:["webgpu"] }
+  };
+
+  function tokFactory(tj){
+    const vocab=tj.model.vocab, idTo={}; for(const t in vocab) idTo[vocab[t]]=t;
+    const special={}; (tj.added_tokens||[]).forEach(t=>{ special[t.content]=t.id; idTo[t.id]=t.content; });
+    const scs=Object.keys(special).sort((a,b)=>b.length-a.length);
+    const ranks={}; (tj.model.merges||[]).forEach((m,i)=>{ const p=Array.isArray(m)?m:m.split(" "); ranks[p[0]+" "+p[1]]=i; });
+    const bs=[]; for(let i=33;i<=126;i++)bs.push(i); for(let i=161;i<=172;i++)bs.push(i); for(let i=174;i<=255;i++)bs.push(i);
+    const cs=bs.slice(); let n=0; for(let b=0;b<256;b++){ if(!bs.includes(b)){bs.push(b);cs.push(256+n);n++;} }
+    const b2u={},u2b={}; for(let i=0;i<bs.length;i++){ const ch=String.fromCharCode(cs[i]); b2u[bs[i]]=ch; u2b[ch]=bs[i]; }
+    const pat=/'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu;
+    const enc=new TextEncoder(), dec=new TextDecoder();
+    function bpe(tok){ let w=tok.split(""); for(;;){ let best=null,bi=-1;
+      for(let i=0;i<w.length-1;i++){ const r=ranks[w[i]+" "+w[i+1]]; if(r!==undefined&&(best===null||r<best)){best=r;bi=i;} }
+      if(bi<0)break; w=w.slice(0,bi).concat([w[bi]+w[bi+1]],w.slice(bi+2)); } return w; }
+    function encRaw(text){ const ids=[]; for(const pc of (text.match(pat)||[])){ let mp=""; for(const byte of enc.encode(pc)) mp+=b2u[byte];
+      for(const sub of bpe(mp)){ const id=vocab[sub]; if(id!==undefined) ids.push(id); } } return ids; }
+    function encode(text){ if(!scs.length) return encRaw(text);
+      const ids=[]; let i=0;
+      while(i<text.length){ let m=null; for(const sc of scs){ if(text.startsWith(sc,i)){ m=sc; break; } }
+        if(m){ ids.push(special[m]); i+=m.length; }
+        else { let nx=text.length; for(const sc of scs){ const p=text.indexOf(sc,i); if(p>=0&&p<nx)nx=p; } ids.push.apply(ids,encRaw(text.slice(i,nx))); i=nx; } }
+      return ids; }
+    function decode(ids){ let str=""; for(const id of ids){ const t=idTo[id]; if(t===undefined||special[t]!==undefined) continue; str+=t; }
+      const by=new Uint8Array(str.length); for(let i=0;i<str.length;i++) by[i]=u2b[str[i]]||0; return dec.decode(by); }
+    return {encode,decode};
+  }
+  function buildPrompt(M,tok,userText){
+    if(M.chat) return tok.encode("<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n"+userText+"<|im_end|>\n<|im_start|>assistant\n");
+    return tok.encode(userText);
+  }
+
+  function chainOf(M){
+    const L=x=>Array.isArray(x)?x:[x];
+    if(M.midStages && M.midStages.length) return M.midStages.map((x,i)=>({idx:i,file:x.file,kv:x.kv,seamIn:L(x.seamIn),seamOut:L(x.seamOut)}));
+    return [{idx:0,file:M.files.mid,kv:M.kvMid,seamIn:L(M.seamF),seamOut:L(M.seamM)}];
+  }
+  const models = {
+    M:null, ort:null, sessF:null, sessB:null, sessM:null, tok:null, midPeerId:null, midResolver:null,
+    busy:false, ready:false, _midReady:false, kvM:null, temp:0.8,
+    mlog(m){ const el=role==="worker"?$("wShardLog"):$("modelLog"); if(el) log(el,m); },
+    i64(a,sh){ return new this.ort.Tensor("int64", BigInt64Array.from(a.map(x=>BigInt(x))), sh); },
+    ekv(M){ return new this.ort.Tensor("float32", new Float32Array(0), [1,M.kvHeads,0,M.headDim]); },
+    kvRange(M,r){ const o={}; for(let i=r[0];i<r[1];i++){ o["past_key_values."+i+".key"]=this.ekv(M); o["past_key_values."+i+".value"]=this.ekv(M); } return o; },
+    s2b(f32){ return abToB64(new Uint8Array(f32.buffer,f32.byteOffset,f32.byteLength)); },
+    b2s(b64){ const u=b64ToU8(b64); return new Float32Array(u.buffer,0,u.length>>2); },
+    tbytes(t){ return abToB64(new Uint8Array(t.data.buffer, t.data.byteOffset, t.data.byteLength)); },
+    tmake(b64,type){ const u=b64ToU8(b64); const data = type==="float16" ? new Uint16Array(u.buffer,0,u.length>>1) : new Float32Array(u.buffer,0,u.length>>2); return new this.ort.Tensor(type, data, [1,1,data.length]); },
+    sess(url){ return this.ort.InferenceSession.create(url,{executionProviders:(this.M&&this.M.ep)||["webgpu"],graphOptimizationLevel:"all",enableMemPattern:!(this.M&&this.M.memPattern===false)}); },
+    feed(sess,pool){ const f={}; for(const nm of sess.inputNames){ if(pool[nm]!==undefined) f[nm]=pool[nm]; } return f; },
+    sample(logits){
+      const d=logits.data, V=logits.dims[2], base=(logits.dims[1]-1)*V, temp=this.temp;
+      if(!(temp>0)){ let bi=0,bv=-1e30; for(let i=0;i<V;i++){ const x=d[base+i]; if(x>bv){bv=x;bi=i;} } return bi; }
+      const k=40, top=[];
+      for(let i=0;i<V;i++){ const v=d[base+i];
+        if(top.length<k){ top.push([v,i]); if(top.length===k) top.sort((a,b)=>a[0]-b[0]); }
+        else if(v>top[0][0]){ top[0]=[v,i]; let j=0; while(j<k-1&&top[j][0]>top[j+1][0]){ const t=top[j];top[j]=top[j+1];top[j+1]=t;j++; } } }
+      let mx=-1e30; for(const t of top) if(t[0]>mx) mx=t[0];
+      let sum=0; const ps=top.map(t=>{ const e=Math.exp((t[0]-mx)/temp); sum+=e; return e; });
+      let r=Math.random()*sum, acc=0; for(let i=0;i<top.length;i++){ acc+=ps[i]; if(r<=acc) return top[i][1]; }
+      return top[top.length-1][1];
+    },
+    async setup(){
+      if(role!=="host"){ alert("Host a circle and have a device join first — it holds the middle layers."); return; }
+      if(this.busy||this.ready) return;
+      const M=MODELS[($("mModel")&&$("mModel").value)||"qwen"]; this.M=M;
+      const stages=chainOf(M); this.stages=stages;
+      const peers=[...host.peers].filter(e=>e[1].channel&&e[1].channel.readyState==="open").map(e=>({id:e[0],name:e[1].name||("peer "+e[0].slice(0,6))}));
+      if(!peers.length){ this.mlog("Need at least one other device in the circle. Share the link, have a phone or laptop join, then try again."); return; }
+      this.busy=true; $("shardBtn").disabled=true; if($("mModel")) $("mModel").disabled=true;
+      this.placement=stages.map((s,j)=>peers[Math.min(peers.length-1, Math.floor(j*peers.length/stages.length))].id);
+      const byPeer=new Map();
+      stages.forEach((s,j)=>{ const pid=this.placement[j]; if(!byPeer.has(pid)) byPeer.set(pid,[]); byPeer.get(pid).push({idx:j,file:s.file,kv:s.kv,seamIn:s.seamIn,seamOut:s.seamOut}); });
+      const nm=pid=>{ const pr=peers.find(p=>p.id===pid); return pr?pr.name:"?"; };
+      $("mPipe").textContent=["this device",...stages.map((s,j)=>nm(this.placement[j])),"this device"].join(" → ");
+      $("mPeer").textContent=[...byPeer.keys()].map(nm).join(", "); $("mHop").textContent="hidden_states";
+      if($("mPrompt") && !($("mPrompt").value||"").trim()) $("mPrompt").value=M.defaultPrompt;
+      if($("mTemp")) $("mTemp").value=M.defTemp;
+      this.mlog("["+M.name+"] FRONT+BACK here; "+stages.length+" interior stage(s) across "+byPeer.size+" peer(s)…");
+      try{
+        this.ort=await loadORT();
+        this.mlog("loading FRONT ("+M.files.front+")…"); this.sessF=await this.sess(M.base+M.files.front);
+        this.mlog("FRONT loaded ✓ — loading BACK ("+M.files.back+")…"); this.sessB=await this.sess(M.base+M.files.back);
+        this.mlog("BACK loaded ✓");
+        this.tok=tokFactory(await(await fetch(M.base+M.files.tok)).json());
+        this._readyCount=0; this._needPeers=byPeer.size; this._allReady=false;
+        for(const [pid,sts] of byPeer){ this.mlog("assigning layers "+sts[0].kv[0]+"–"+(sts[sts.length-1].kv[1]-1)+" to "+nm(pid)); host.peers.get(pid).channel.send(JSON.stringify({cmd:"shard-assign", model:M.id, stages:sts})); }
+        const ok=await this.waitChain(900000);
+        if(!ok){ this.mlog("a stage never reported ready — aborting."); this.busy=false; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; return; }
+        this.ready=true; $("shardBtn").textContent="Pipeline ready ✓ ("+M.id+")"; if($("genBtn")) $("genBtn").disabled=false;
+        this.mlog("pipeline ready — "+(M.chat?"ask a question":"type a prompt")+" and hit Generate.");
+      }catch(e){ this.mlog("error: "+(e&&e.message||e)); $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; }
+      this.busy=false;
+    },
+    waitChain(ms){ return new Promise(res=>{ const t0=performance.now(); const tick=()=>{ if(this._allReady)return res(true); if(performance.now()-t0>ms)return res(false); setTimeout(tick,80); }; tick(); }); },
+    onShardReady(){ this._readyCount=(this._readyCount||0)+1; this.mlog("stage node ready ✓ ("+this._readyCount+"/"+this._needPeers+")"); if(this._readyCount>=this._needPeers) this._allReady=true; },
+    askStage(j,step,token,seqlen,carry){ return new Promise(res=>{ this.stageResolver=res;
+      const seams=carry.map(t=>({bytes:this.tbytes(t),type:t.type}));
+      host.peers.get(this.placement[j]).channel.send(JSON.stringify({cmd:"shard-fwd",stageIdx:j,step:step,token:token,seqlen:seqlen,seams:seams})); }); },
+    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; r((m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32"))); } },
+    async generate(){
+      if(!this.ready||this.busy) return; const M=this.M;
+      const text=(($("mPrompt")&&$("mPrompt").value)||"").trim();
+      if(!text){ this.mlog("type a prompt first."); return; }
+      let ids=buildPrompt(M,this.tok,text); if(!ids.length){ this.mlog("couldn't tokenize."); return; }
+      const maxNew=Math.max(1,Math.min(96,parseInt(($("mMax")&&$("mMax").value)||"40",10)||40));
+      this.temp=Math.max(0,parseFloat(($("mTemp")&&$("mTemp").value)||String(M.defTemp)));
+      this.busy=true; if($("genBtn"))$("genBtn").disabled=true; $("mTps").textContent="…";
+      const tokens=[...ids], gen=[]; let last=null;
+      const kvF=this.kvRange(M,M.kvFront), kvB=this.kvRange(M,M.kvBack); const tD=[];
+      const head=(M.chat? "":text); $("modelOut").textContent=head+" "; this.mlog("query: "+ids.length+" tokens, up to "+maxNew+"…");
+      try{
+        for(let step=0;;step++){
+          const t=tokens[step], seqlen=step+1, t0=performance.now();
+          const pool={ input_ids:this.i64([t],[1,1]), attention_mask:this.i64(new Array(seqlen).fill(1),[1,seqlen]), position_ids:this.i64([step],[1,1]) };
+          const of=await this.sessF.run(Object.assign({},this.feed(this.sessF,pool),kvF));
+          for(const k in of) if(k.indexOf("present")===0) kvF[k.replace("present","past_key_values")]=of[k];
+          let carry=this.stages[0].seamIn.map(n=>of[n]);
+          for(let j=0;j<this.stages.length;j++) carry=await this.askStage(j,step,t,seqlen,carry);
+          this.stages[this.stages.length-1].seamOut.forEach((n,i)=>{ pool[n]=carry[i]; });
+          const ob=await this.sessB.run(Object.assign({},this.feed(this.sessB,pool),kvB));
+          for(const k in ob) if(k.indexOf("present")===0) kvB[k.replace("present","past_key_values")]=ob[k];
+          if(step<ids.length-1){ $("modelOut").textContent=head+" …reading prompt "+(step+1)+"/"+ids.length; }
+          last=ob["logits"]; const bi=this.sample(last);
+          if(step>=ids.length-1){
+            if(M.stop && bi===M.stop) break;
+            tokens.push(bi); gen.push(bi); tD.push(performance.now()-t0);
+            $("modelOut").textContent=head+this.tok.decode(gen);
+            if(gen.length>=maxNew) break;
+          }
+        }
+        const avg=tD.reduce((a,b)=>a+b,0)/(tD.length||1); $("mTps").textContent=(1000/avg).toFixed(1)+" tok/s";
+        this.mlog("✓ answered across "+(this._needPeers+1)+" devices / "+this.stages.length+" interior stage(s) ("+gen.length+" tokens) on "+M.id+" — the model never lived on one.");
+      }catch(e){ this.mlog("generation error: "+(e&&e.message||e)); }
+      this.busy=false; if($("genBtn"))$("genBtn").disabled=false;
+    },
+    async onAssign(m){
+      const M=MODELS[m.model]||MODELS.qwen; this.M=M;
+      const stages=(m.stages&&m.stages.length)?m.stages:[{idx:0,file:M.files.mid,kv:M.kvMid,seamIn:M.seamF,seamOut:M.seamM}];
+      this.stageMeta={}; this.sessByStage={}; this.kvByStage={};
+      $("wShardStage").classList.remove("hidden");
+      $("wShardInfo").textContent=M.id+" — loading "+stages.length+" interior stage(s) on your GPU…";
+      try{
+        this.ort=await loadORT();
+        for(const st of stages){ this.mlog("loading stage layers "+st.kv[0]+"–"+(st.kv[1]-1)+"…"); this.sessByStage[st.idx]=await this.sess(M.base+st.file); this.stageMeta[st.idx]=st; }
+        $("wShardInfo").textContent=M.id+" — "+stages.length+" stage(s) ready ✓ (your shard of a distributed model)";
+        this.mlog("shard ready on this device ("+M.id+", "+stages.length+" stage(s))");
+        worker.channel.send(JSON.stringify({cmd:"shard-ready"}));
+      }catch(e){ $("wShardInfo").textContent="couldn't load shard: "+(e&&e.message||e); this.mlog("shard load failed: "+(e&&e.message||e)); }
+    },
+    async onFwd(m){
+      const st=this.stageMeta&&this.stageMeta[m.stageIdx]; const s=this.sessByStage&&this.sessByStage[m.stageIdx];
+      if(!s||!st) return; const M=this.M;
+      if(m.step===0) this.kvByStage[m.stageIdx]=this.kvRange(M,st.kv);
+      const kvm=this.kvByStage[m.stageIdx];
+      const pool={ input_ids:this.i64([m.token],[1,1]), attention_mask:this.i64(new Array(m.seqlen).fill(1),[1,m.seqlen]),
+                   position_ids:this.i64([m.step],[1,1]) };
+      const inS=Array.isArray(st.seamIn)?st.seamIn:[st.seamIn], outS=Array.isArray(st.seamOut)?st.seamOut:[st.seamOut];
+      (m.seams||[]).forEach((sm,i)=>{ pool[inS[i]]=this.tmake(sm.bytes,sm.type||"float32"); });
+      const out=await s.run(Object.assign({},this.feed(s,pool),kvm));
+      for(const k in out) if(k.indexOf("present")===0) kvm[k.replace("present","past_key_values")]=out[k];
+      try{ worker.channel.send(JSON.stringify({cmd:"shard-out",stageIdx:m.stageIdx,step:m.step,seams:outS.map(n=>({bytes:this.tbytes(out[n]),type:out[n].type}))})); }catch(e){ this.mlog("stage run error: "+(e&&e.message||e)); }
+    }
+  };
+
+  // ---- UI wiring ----
+  $("hostBtn").onclick=()=>sig({type:"create"});
+  $("joinBtn").onclick=()=>{ const c=$("joinCode").value.trim(); if (c.length>=4) doJoin(c); };
+  $("joinCode").addEventListener("keydown", e=>{ if (e.key==="Enter") $("joinBtn").click(); });
+  $("spectateBtn").onclick=()=>{ host.spectate=!host.spectate; $("spectateBtn").classList.toggle("active", host.spectate); if(!host.spectate) host.stopSpectate(); };
+  $("chatSend").onclick=sendChat;
+  $("chatInput").addEventListener("keydown", e=>{ if (e.key==="Enter"){ e.preventDefault(); sendChat(); } });
+  $("chatName").onchange=()=>{ const v=$("chatName").value.trim(); if (v) myName=v;
+    if (role==="host") host.broadcastRoster();
+    else if (role==="worker" && worker.channel && worker.channel.readyState==="open"){ try{ worker.channel.send(JSON.stringify({cmd:"hello", specs:deviceSpecs(), name:myName})); }catch(e){} } };
+  // streaming wiring
+  $("liveBtn").onclick=()=>{ if (!scene.live) host.goLive(); else host.stopLive(); };
+  (function(){ const sc=$("scene"); if (!sc) return;
+    sc.addEventListener("pointermove", e=>{ const r=sc.getBoundingClientRect(); scene.wells.set("self", { x:(e.clientX-r.left)/r.width*sc.width, y:(e.clientY-r.top)/r.height*sc.height }); });
+    sc.addEventListener("pointerleave", ()=>scene.wells.delete("self"));
+  })();
+  (function(){ const vid=$("streamVid"); if (!vid) return; let last=0;
+    vid.addEventListener("pointermove", e=>{ const t=e.timeStamp||0; if (t-last<40) return; last=t;
+      const r=vid.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+      if (worker.channel && worker.channel.readyState==="open"){ try{ worker.channel.send(JSON.stringify({cmd:"input", x:x, y:y})); }catch(e2){} } });
+  })();
+  // code lab wiring
+  async function buildAndRun(){
+    lab.saveCurrent();
+    const files=lab.projects[lab.cur].files; let bytes=null, watSrc=null, jsSrc=null, wgslSrc=null, name=null;
+    for (const fn of Object.keys(files)){ if (fn.toLowerCase().endsWith(".wasm")){ name=fn; const v=files[fn]; if (typeof v==="string" && v.indexOf("base64:")===0) bytes=b64ToU8(v.slice(7)); break; } }
+    if (!bytes){ for (const fn of Object.keys(files)){ if (fn.toLowerCase().endsWith(".wgsl")){ name=fn; wgslSrc=files[fn]; break; } } }
+    if (!bytes && !wgslSrc){ for (const fn of Object.keys(files)){ if (fn.toLowerCase().endsWith(".wat")){ name=fn; watSrc=files[fn]; break; } } }
+    if (!bytes && !wgslSrc && !watSrc){ for (const fn of Object.keys(files)){ const ln=fn.toLowerCase(); if (ln.endsWith(".js")||ln.endsWith(".mjs")){ name=fn; jsSrc=files[fn]; break; } } }
+    if (!bytes && !wgslSrc && !watSrc && !jsSrc){ log($("labLog"),"no runnable entry found — add a .wgsl (GPU), or .js / .wat / .wasm (CPU)."); return; }
+    try {
+      if (bytes){ await host.runModule(bytes, name||"module", "wasm"); }
+      else if (wgslSrc){ await host.runModule(wgslSrc, name||"kernel", "wgsl"); }
+      else if (watSrc){ log($("labLog"),"compiling "+name+" (WAT) in-browser via wabt…"); const b=await compileWat(watSrc); log($("labLog"),"compiled -> "+b.length+" bytes wasm"); await host.runModule(b, name||"module", "wasm"); }
+      else { log($("labLog"),"loading "+name+" (JavaScript) — runs as source in each worker"); await host.runModule(jsSrc, name||"module", "js"); }
+    } catch(e){ log($("labLog"),"build/run error: "+e.message); }
+  }
+  if ($("editor")){
+    $("buildRunBtn").onclick=()=>buildAndRun();
+    $("editor").addEventListener("input", ()=>lab.onEdit());
+    $("newFileBtn").onclick=()=>lab.newFile();
+    $("delFileBtn").onclick=()=>lab.delFile();
+    $("newProjBtn").onclick=()=>lab.newProject();
+    $("uploadBtn").onclick=()=>$("uploadInput").click();
+    $("uploadInput").onchange=e=>{ if (e.target.files.length) lab.upload(e.target.files); e.target.value=""; };
+  }
+  if ($("shardBtn")) $("shardBtn").onclick=()=>models.setup();
+  if ($("genBtn")) $("genBtn").onclick=()=>models.generate();
+  $("copyBtn").onclick=()=>{ $("shareLink").select(); navigator.clipboard.writeText($("shareLink").value); $("copyBtn").textContent="Copied"; setTimeout(()=>$("copyBtn").textContent="Copy link",1500); };
+  document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible" && wakeLock===null) requestWakeLock(); });
+
+  loadIce().then(connect);
+})();
+</script>
+</body>
+</html>

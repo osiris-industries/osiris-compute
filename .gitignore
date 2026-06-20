@@ -1,0 +1,7 @@
+node_modules/
+*.bak
+*.bak.*
+*.log
+.env
+.DS_Store
+public/models/
