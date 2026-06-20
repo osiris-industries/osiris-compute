@@ -1,0 +1,29 @@
+{
+  "id": "qwen14b",
+  "name": "Qwen2.5-14B-Instruct \u2014 distributed",
+  "source_repo": "Qwen/Qwen2.5-14B-Instruct",
+  "onnx_file": "onnx/model_q4.onnx",
+  "num_layers": 48,
+  "num_kv_heads": 8,
+  "head_dim": 128,
+  "vocab": 152064,
+  "hidden": 5120,
+  "embed_policy": "int8",
+  "bake_head": false,
+  "mem_pattern": false,
+  "interior_stages": "auto",
+  "phone_shard_mb": 600,
+  "max_shard_mb": 1400,
+  "chat": true,
+  "chat_template": null,
+  "stop": 151645,
+  "default_prompt": "Write a haiku about distributed computing.",
+  "def_temp": 0.5,
+  "ep": [
+    "webgpu"
+  ],
+  "box_size": "gpu-h100x1-80gb",
+  "region": "nyc2",
+  "swap_gb": 48,
+  "image": "gpu-h100x1-base"
+}

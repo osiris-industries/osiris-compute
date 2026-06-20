@@ -1,0 +1,17 @@
+{
+  "id": "llama3b",
+  "name": "Llama-3.2-3B-Instruct",
+  "hf_repo": "onnx-community/Llama-3.2-3B-Instruct-onnx-web",
+  "onnx_file": "onnx/model_q4.onnx",
+  "num_kv_heads": 8,
+  "head_dim": 128,
+  "embed_policy": "int8",
+  "max_shard_mb": 1100,
+  "phone_shard_mb": 600,
+  "mid_layers": 8,
+  "chat": true,
+  "stop": 128009,
+  "chat_template": "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+  "default_prompt": "What is the capital of France?",
+  "def_temp": 0.5
+}

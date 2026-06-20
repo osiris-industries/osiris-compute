@@ -1,0 +1,26 @@
+{
+  "id": "mistral7b",
+  "name": "Mistral-7B-Instruct-v0.3 \u2014 distributed",
+  "hf_repo": "self-export (optimum), not from hub",
+  "onnx_file": "onnx/model_q4.onnx",
+  "num_layers": 32,
+  "num_kv_heads": 8,
+  "head_dim": 128,
+  "vocab": 32768,
+  "hidden": 4096,
+  "embed_policy": "fp16",
+  "bake_head": false,
+  "mem_pattern": false,
+  "interior_stages": "auto",
+  "phone_shard_mb": 600,
+  "max_shard_mb": 1100,
+  "chat": true,
+  "chat_template": "<s>[INST] {user} [/INST]",
+  "stop": 2,
+  "default_prompt": "Write a haiku about distributed computing.",
+  "def_temp": 0.3,
+  "ep": [
+    "webgpu"
+  ],
+  "source_repo": "mistralai/Mistral-7B-Instruct-v0.3"
+}

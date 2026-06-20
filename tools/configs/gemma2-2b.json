@@ -1,0 +1,17 @@
+{
+  "id": "gemma2b",
+  "name": "Gemma-2-2B-it",
+  "hf_repo": "onnx-community/gemma-2-2b-it",
+  "onnx_file": "onnx/model_q4.onnx",
+  "num_kv_heads": 4,
+  "head_dim": 256,
+  "embed_policy": "int8",
+  "max_shard_mb": 900,
+  "phone_shard_mb": 300,
+  "mid_layers": 3,
+  "chat": true,
+  "stop": 107,
+  "default_prompt": "What is the capital of France?",
+  "def_temp": 0.5,
+  "_note": "Gemma needs extra op handling (logit softcap, sliding-window attn, embed *sqrt(d)); 256k vocab forces int8/int4 embed. Template only — expect warnings + custom work."
+}

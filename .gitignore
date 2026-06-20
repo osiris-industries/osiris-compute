@@ -4,4 +4,7 @@ node_modules/
 *.log
 .env
 .DS_Store
+.local/
 public/models/
+tools/__pycache__/
+tools/work/

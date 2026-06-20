@@ -44,18 +44,44 @@ The live grid currently serves five models this way — from Qwen2.5-0.5B up to 
 ## Quickstart
 
 ```bash
-npm install            # ws (see package.json); server uses node's built-in http
-node server.js         # signaling router + static host on $PORT (default 8080)
-# open http://localhost:8080 in two browser tabs / two devices
+npm install                 # one dep: ws (see package.json); server uses node's built-in http
+node server.js              # signaling router + static host on http://127.0.0.1:8080
+# open http://localhost:8080 in two browser tabs to form a circle
 ```
+
+That gets you the running signaling server and the full circle UI. To form a circle
+across **two separate devices** on your LAN, bind to all interfaces:
+
+```bash
+HOST=0.0.0.0 node server.js
+# then open http://<your-lan-ip>:8080 on the other device
+```
+
+### Try a real distributed model
+
+A fresh clone has the framework but **no model shards** (they are large binaries,
+not stored in git). There are three ways to actually run a model:
+
+1. **Just try the live grid** — open <https://compute.osirisindustries.net> on two
+   devices and pick a model. Zero setup; this is the real public grid.
+2. **Fetch a demo model into your own server** — pull a small model's shards
+   (Qwen2.5-0.5B, ~1.3GB) from the public grid into `public/models/`:
+   ```bash
+   ./fetch-demo-model.sh        # downloads the 'qwen' shards
+   node server.js               # the 'qwen' model now loads locally
+   ```
+3. **Build your own** from any HuggingFace model with the partitioning toolchain in
+   [`tools/`](tools/) (export → int4-quant → seam-aware slice → serve). See
+   [tools/README.md](tools/README.md).
 
 ### Configuration (environment variables)
 
 | var | purpose | default |
 |---|---|---|
-| `PORT` / `HOST` | where the signaling + static server listens | `8080` / `0.0.0.0` |
+| `PORT` | port the signaling + static server listens on | `8080` |
+| `HOST` | interface to bind | `127.0.0.1` (set `0.0.0.0` for other devices on your network) |
 | `TURN_SECRET` | shared secret for time-limited TURN credentials (HMAC-SHA1) | — (TURN off if unset) |
-| `TURN_HOST` / `TURN_PORT` | your coturn relay, for peers behind symmetric NATs | — |
+| `TURN_HOST` / `TURN_PORT` | your coturn relay, for peers behind symmetric NATs | — / `3478` |
 
 STUN uses public `stun.l.google.com:19302` out of the box. TURN is **optional** — only needed so peers on hostile NATs can still connect; supply your own relay. No secrets are committed to this repo.
 
@@ -64,12 +90,18 @@ STUN uses public `stun.l.google.com:19302` out of the box. TURN is **optional** 
 ## Repository layout
 
 ```
-server.js          signaling router (WebRTC SDP/ICE relay, roster, ICE-config endpoint) + static host
-public/index.html  the client — WebRTC mesh, WASM/WebGPU sandbox, model registry, shard chaining
-public/wabt.js     vendored WebAssembly Binary Toolkit (Apache-2.0; see NOTICE)
+server.js            signaling router (WebRTC SDP/ICE relay, roster, ICE-config endpoint) + static host
+public/index.html    the client — WebRTC mesh, WASM/WebGPU sandbox, model registry, shard chaining
+public/wabt.js       vendored WebAssembly Binary Toolkit (Apache-2.0; see NOTICE)
+fetch-demo-model.sh  pull a small demo model's shards from the public grid into public/models/
+tools/               model partitioning toolchain (HF model → browser-ready FRONT/interior/BACK shards)
+tools/configs/       example model configs (qwen, mistral7b, llama3b, gemma2-2b, …)
 ```
 
-Model **shards** (the `.onnx` files) are served as static assets out-of-band (not in this repo). The partitioning toolchain that produces browser-ready FRONT / interior / BACK shards from a HuggingFace model is a separate piece of the project.
+Model **shards** (the `.onnx` files) are large and served as static assets
+out-of-band — they live under `public/models/<id>/` at runtime but are **not** stored
+in git (see `.gitignore`). Use `fetch-demo-model.sh` to grab one, or build your own
+with the toolchain in `tools/`.
 
 ---
 

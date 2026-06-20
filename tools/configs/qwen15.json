@@ -1,0 +1,16 @@
+{
+  "id": "qwen15",
+  "name": "Qwen2.5-1.5B-Instruct",
+  "hf_repo": "onnx-community/Qwen2.5-1.5B-Instruct",
+  "onnx_file": "onnx/model_q4.onnx",
+  "num_kv_heads": 2,
+  "head_dim": 128,
+  "embed_policy": "fp16",
+  "max_shard_mb": 900,
+  "phone_shard_mb": 300,
+  "mid_layers": 3,
+  "chat": true,
+  "stop": 151645,
+  "default_prompt": "What is the capital of France?",
+  "def_temp": 0.5
+}

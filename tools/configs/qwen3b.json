@@ -1,0 +1,16 @@
+{
+  "id": "qwen3b",
+  "name": "Qwen2.5-Coder-3B-Instruct",
+  "hf_repo": "onnx-community/Qwen2.5-Coder-3B-Instruct",
+  "onnx_file": "onnx/model_q4.onnx",
+  "num_kv_heads": 2,
+  "head_dim": 128,
+  "embed_policy": "int8",
+  "max_shard_mb": 900,
+  "phone_shard_mb": 900,
+  "mid_layers": 6,
+  "chat": true,
+  "stop": 151645,
+  "default_prompt": "Write a Python function to reverse a string.",
+  "def_temp": 0.3
+}
