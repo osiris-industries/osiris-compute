@@ -43,6 +43,40 @@ The live grid currently serves several models this way — from Qwen2.5-0.5B up 
 
 ---
 
+## Run it on a LAN — the fast path ⚡
+
+If everyone is **on the same network** (a house, an office, a dorm, one router), Osiris Compute gets dramatically faster — close to how distributed inference behaves inside a data center. Here's the physics, because it's the whole point:
+
+In pipeline-parallel decoding, the only thing that crosses the network per token is the **hidden state** — about `hidden_dim × 2 bytes` (≈ **8 KB** for a 7B model). That's tiny, so you are **never bandwidth-bound.** What you actually pay is **one network round-trip per hop**, and since each token depends on the last, those hops happen **in series**:
+
+```
+per-token time  ≈  Σ(stage compute)  +  (number of hops) × round-trip-latency
+```
+
+The compute term is fixed by your devices. The *only* term that changes between "friends across the internet" and "friends in the same room" is the round-trip latency — multiplied by ~7–8 hops. So it dominates everything:
+
+| network | RTT / hop | network cost / token (7 hops) | regime |
+|---|---|---|---|
+| Open internet (WAN) | ~40 ms | **~280 ms** | latency-bound, sluggish |
+| Wi-Fi LAN | ~3–8 ms | ~20–55 ms | network now a minority of the budget |
+| Wired gigabit LAN | ~0.4 ms | **~3 ms** | **compute-bound — network effectively gone** |
+
+That last row *is* the data-center condition. A data-center pipeline isn't magic; its interconnect (NVLink / InfiniBand) just has negligible latency relative to compute. A gigabit LAN is the consumer-grade version of the same fabric — a **10–100× cut in round-trip time vs the open internet**, which is exactly the term that was hurting. On a LAN, WebRTC also connects peers **directly** over host candidates (no TURN relay, no internet round-trip at all), and your data never leaves the network — so it's **fast _and_ fully private/local.**
+
+There's a second-order win, too: on a WAN you want to **minimize hops** (fewer, beefier devices). On a LAN hops are nearly free, so you can split **deeper** across **more modest devices** (more phones, smaller shards each) and run a **bigger** model than any single one of them could hold.
+
+**To run a LAN circle:**
+
+```bash
+HOST=0.0.0.0 node server.js                 # bind to the network, not just localhost
+./fetch-demo-model.sh                        # pre-load a model's shards onto this one host
+# everyone on the same network opens:  http://<this-machine-LAN-ip>:8080
+```
+
+Pre-fetching the shards onto the host machine means peers pull them over the local network (fast), and nothing about the model or your prompts ever touches the internet. **A LAN party of friends pooling their phones to run a 7B together is the sweet spot for this project.**
+
+---
+
 ## For reviewers (DigitalOcean Open Source team 👋)
 
 The fastest way to see it work — **no clone, no install:**
@@ -54,6 +88,7 @@ The fastest way to see it work — **no clone, no install:**
 A few honest expectations:
 - **WebGPU + Chrome/Edge desktop** is the supported path for the anchor device.
 - **First model load downloads its shards** to the browser, so there's a brief wait before the first token (smaller model = faster).
+- **Latency over the public internet is the cost center** (see [Run it on a LAN](#run-it-on-a-lan--the-fast-path-)) — on a shared local network it gets *much* faster, approaching data-center behavior. That's the headline use case for the self-host release.
 - **Mistral-7B is mid-testing** (see the status note above) — for a clean first impression, use a small model.
 
 Happy to give a live walkthrough across a couple of your own devices — just reach out to **admin@osirisindustries.net**.
@@ -69,7 +104,8 @@ node server.js              # signaling router + static host on http://127.0.0.1
 ```
 
 That gets you the running signaling server and the full circle UI. To form a circle
-across **two separate devices** on your LAN, bind to all interfaces:
+across **two separate devices** on your LAN, bind to all interfaces (and see the
+[Run it on a LAN](#run-it-on-a-lan--the-fast-path-) section for why that's the fast path):
 
 ```bash
 HOST=0.0.0.0 node server.js
