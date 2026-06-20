@@ -4,7 +4,7 @@
 
 Osiris Compute lets people pool the spare compute of their own devices and trusted peers into a **private circle** — straight from the browser. It is a modern, web-era successor to volunteer-computing projects like BOINC and SETI@home, built for one stubborn belief: **useful computation should not have to live inside a hyperscaler's data center.**
 
-Live grid: **https://compute.osirisindustries.net**
+Live grid: **https://compute.osirisindustries.net**  ·  Source: **https://github.com/osiris-industries/osiris-compute**
 
 ---
 
