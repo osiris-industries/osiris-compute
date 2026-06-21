@@ -30,7 +30,7 @@ for f in "${files[@]}"; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -I "$url" || echo 000)
   if [ "$code" = "200" ]; then
     echo "  -> $f"
-    curl -fsSL "$url" -o "$DIR/$f"
+    curl -fL -sS --retry 5 --retry-delay 2 --retry-all-errors -C - -o "$DIR/$f" "$url"
     got=$((got+1))
   fi
 done

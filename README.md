@@ -83,16 +83,20 @@ connect, but have **no WebGPU and cannot run inference.** The fix is to serve
 WebGPU works on every device.
 
 ```bash
-# one-time: make a self-signed cert for this host
+# one-time: make a self-signed cert for THIS host's LAN IP.
+# Modern browsers ignore CN and require a subjectAltName (SAN), so list the IP
+# (and any hostname) peers will actually open here — replace 192.168.1.50:
 openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-  -keyout key.pem -out cert.pem -subj "/CN=osiris-lan"
+  -keyout key.pem -out cert.pem -subj "/CN=osiris-lan" \
+  -addext "subjectAltName=IP:192.168.1.50,DNS:localhost,IP:127.0.0.1"
 
 # serve https+wss on all interfaces, with a demo model pre-loaded
 ./fetch-demo-model.sh
 HOST=0.0.0.0 TLS_CERT=cert.pem TLS_KEY=key.pem node server.js   # -> https on :8443
 
 # everyone on the same network opens:  https://<this-machine-LAN-ip>:8443
-# (accept the self-signed warning once per device — that's expected)
+# (self-signed: click Advanced -> Proceed once per device — that's expected. The SAN
+# above prevents the extra IP-mismatch error; to remove the warning entirely, use mkcert.)
 ```
 
 Pre-fetching the shards onto the host means peers pull them over the local network (fast), and nothing about the model or your prompts ever touches the internet. **A LAN party of friends pooling their phones to run a 7B together is the sweet spot for this project.**
