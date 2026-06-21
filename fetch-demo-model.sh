@@ -6,6 +6,7 @@
 #
 #   ./fetch-demo-model.sh            # fetch the default demo model (qwen)
 #   ./fetch-demo-model.sh qwen3b     # fetch a different served model
+#   ./fetch-demo-model.sh qwen15dist # 1.5B in 6 interior shards — spreads across up to 6 phones
 #
 # Source host can be overridden:  MODEL_HOST=https://your.host ./fetch-demo-model.sh
 set -euo pipefail

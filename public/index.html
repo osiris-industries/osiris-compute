@@ -185,6 +185,7 @@
               <option value="qwen15n">Qwen2.5-1.5B — 3-device chain (2 stages)</option>
               <option value="qwen3b">Qwen2.5-Coder-3B-Instruct</option>
               <option value="mistral7b">Mistral-7B-Instruct-v0.3 — distributed</option>
+              <option value="qwen15dist">Qwen2.5-1.5B — distributed-built, 6-shard chain (up to 6 phones)</option>
               <option value="distilgpt2">distilgpt2 — 82M, fast (completes text)</option>
             </select>
             <button class="btn" id="shardBtn">Set up the model pipeline</button>
@@ -1093,6 +1094,19 @@ self.onmessage = function(ev){
       seamF:"/model/layers.10/Add_1_output_0", seamM:"/model/layers.12/Add_1_output_0",
       kvFront:[0,11], kvMid:[11,13], kvBack:[13,24], kvHeads:2, headDim:64,
       chat:true, stop:151645, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"] },
+    qwen15dist: { id:"qwen15dist", name:"Qwen2.5-1.5B (distributed-built, 6 shards)", base:"/models/qwen15dist/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"hidden_at_2", seamM:"hidden_at_26",
+      kvFront:[0,2], kvBack:[26,28], kvHeads:2, headDim:128,
+      midStages:[
+        {file:"qMID0.onnx", kv:[2,6], seamIn:"hidden_at_2", seamOut:"hidden_at_6"},
+        {file:"qMID1.onnx", kv:[6,10], seamIn:"hidden_at_6", seamOut:"hidden_at_10"},
+        {file:"qMID2.onnx", kv:[10,14], seamIn:"hidden_at_10", seamOut:"hidden_at_14"},
+        {file:"qMID3.onnx", kv:[14,18], seamIn:"hidden_at_14", seamOut:"hidden_at_18"},
+        {file:"qMID4.onnx", kv:[18,22], seamIn:"hidden_at_18", seamOut:"hidden_at_22"},
+        {file:"qMID5.onnx", kv:[22,26], seamIn:"hidden_at_22", seamOut:"hidden_at_26"}
+      ],
+      chat:true, stop:151645, chatTemplate:null, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"], memPattern:false },
     distilgpt2: { id:"distilgpt2", name:"distilgpt2 (82M)", base:"/models/",
       files:{front:"stage_FRONT.onnx", mid:"stage_MID.onnx", back:"stage_BACK.onnx", tok:"tokenizer.json"},
       seamF:"/transformer/h.1/Add_1_output_0", seamM:"/transformer/h.3/Add_1_output_0",

@@ -92,3 +92,41 @@ Copy the resulting files to `public/models/<id>/` on whatever host serves the
 client, so they are reachable at `/models/<id>/qFRONT.onnx`, etc. The client's
 model registry (in `public/index.html`) points each model at `base:"/models/<id>/"`.
 Range requests should be enabled so the browser can stream large shards.
+
+---
+
+## Lean & distributed K-way builder (no big box needed)
+
+`osiris_partition.py` above slices a *pre-exported monolithic* ONNX, which means
+one machine must first hold the whole fp32 model. The newer builder avoids that
+entirely — it exports each stage independently and never materializes the whole
+model, so a 16GB box can build a 14B and a tiny box can build a 1.5B.
+
+Files:
+- `osiris_build_sharded.py` — the exact-correctness core: exports one contiguous
+  stage (FRONT / interior_j / BACK) to ONNX with the shard I/O contract, and proves
+  a chained re-export reproduces the full model's logits.
+- `osiris_build_lean.py` — **the K-way partitioner.** Meta-device skeleton + partial
+  safetensors load of only a stage's layers → export → int4-quant → emit the client
+  registry block. `--interior K` controls how many interior shards (one per phone).
+- `osiris_build_distributed.py` — farm the K stages across machines (`--hosts
+  local | ssh:user@host:/dir`), round-robin, scp shards back. No merge step.
+
+Build a model split into K interior shards on ONE box:
+```bash
+python osiris_build_lean.py --repo Qwen/Qwen2.5-1.5B-Instruct \
+  --workdir out --front 2 --back 2 --interior 6 --embed-policy fp16 \
+  --id qwen15dist --name "Qwen2.5-1.5B (6 shards)"
+# -> out/qFRONT.onnx, qMID0..5.onnx, qBACK.onnx, tokenizer.json, registry_entry.txt
+```
+
+Or farm the same build across machines:
+```bash
+python osiris_build_distributed.py build --repo Qwen/Qwen2.5-1.5B-Instruct \
+  --workdir out --front 2 --back 2 --interior 6 --embed-policy fp16 \
+  --hosts ssh:user@boxA:/build ssh:user@boxB:/build --remote-venv --max-parallel 2
+```
+
+Then serve `out/` at `public/models/<id>/` and paste the printed `registry_entry.txt`
+block into `public/index.html`'s `MODELS` map (+ a `<option>`). The number of
+interior shards = the number of phones the model can spread across at inference.
