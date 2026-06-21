@@ -11,10 +11,9 @@ Osiris Compute lets people pool the spare compute of their own devices and trust
 
 ▶ **Try the live grid:** **https://compute.osirisindustries.net** (desktop Chrome/Edge, open it in two tabs)  ·  Source: **https://github.com/osiris-industries/osiris-compute**
 
-<!-- DEMO: drop a short screen-recording GIF here once captured, e.g.
-![Osiris Compute: a 7B model streaming across a circle of browsers](docs/demo.gif)
-A ~20s clip of two tabs (or a phone + laptop on one wifi) streaming tokens is the
-single highest-impact thing to add to this README. -->
+![Osiris Compute: Qwen2.5 split across a laptop (host) and a phone (peer) on a LAN, streaming tokens across the circle](docs/demo.gif)
+
+*A real LAN run: the model's layers are split across a laptop and a phone — interior layers live on the phone, and tokens stream device to device. Kill the phone mid-generation and it stalls, because that slice genuinely only exists there.*
 
 ---
 
