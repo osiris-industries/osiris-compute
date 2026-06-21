@@ -19,6 +19,13 @@
  *
  * The relay still only forwards handshake blobs — never a byte of computation.
  * No database, no monetization. In-memory rooms only.
+ *
+ * TLS / LAN: WebGPU is only exposed in a "secure context". localhost counts even
+ * over http, but a plain-http LAN IP (http://192.168.x.x) does NOT — so peers
+ * joining a LAN host over http have no WebGPU and cannot run inference. Set
+ * TLS_CERT + TLS_KEY (a self-signed cert is fine) to serve https + wss; then a
+ * LAN IP becomes a secure context and WebGPU works on every device. See README.
+ *
  * Licensed under AGPL-3.0-or-later. (c) 2026 Osiris Industries.
  */
 
@@ -28,7 +35,11 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
-const PORT = process.env.PORT || 8080;
+const TLS_CERT = process.env.TLS_CERT || '';
+const TLS_KEY = process.env.TLS_KEY || '';
+const TLS_ON = !!(TLS_CERT && TLS_KEY);
+
+const PORT = process.env.PORT || (TLS_ON ? 8443 : 8080);
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
@@ -63,7 +74,7 @@ const TYPES = {
   '.onnx': 'application/octet-stream', '.wasm': 'application/wasm',
 };
 
-const server = http.createServer((req, res) => {
+function handler(req, res) {
   const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
   if (urlPath === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
   if (urlPath === '/ice') {
@@ -97,7 +108,21 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': TYPES[ext] || 'application/octet-stream' });
     res.end(data);
   });
-});
+}
+
+let server;
+if (TLS_ON) {
+  let creds;
+  try {
+    creds = { cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) };
+  } catch (e) {
+    console.error(`[osiris-compute] TLS_CERT/TLS_KEY set but unreadable: ${e.message}`);
+    process.exit(1);
+  }
+  server = require('https').createServer(creds, handler);
+} else {
+  server = http.createServer(handler);
+}
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 256 * 1024 });
 function send(ws, obj) { if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); }
@@ -216,5 +241,10 @@ const heartbeat = setInterval(() => {
 wss.on('close', () => clearInterval(heartbeat));
 
 server.listen(PORT, HOST, () => {
-  logE(`[osiris-compute] signaling router v2 on http://${HOST}:${PORT}  (ws:/ws, roster on, turn:${TURN_HOST ? 'on' : 'off'})`);
+  const scheme = TLS_ON ? 'https' : 'http';
+  const wscheme = TLS_ON ? 'wss' : 'ws';
+  logE(`[osiris-compute] signaling router v2 on ${scheme}://${HOST}:${PORT}  (${wscheme}:/ws, roster on, turn:${TURN_HOST ? 'on' : 'off'}, tls:${TLS_ON ? 'on' : 'off'})`);
+  if (!TLS_ON && HOST === '0.0.0.0') {
+    logE('[osiris-compute] note: serving http on a LAN — joining devices need a secure context for WebGPU. Set TLS_CERT/TLS_KEY for https (see README "Run it on a LAN").');
+  }
 });

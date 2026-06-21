@@ -75,15 +75,32 @@ That last row *is* the data-center condition. A data-center pipeline isn't magic
 
 There's a second-order win, too: on a WAN you want to **minimize hops** (fewer, beefier devices). On a LAN hops are nearly free, so you can split **deeper** across **more modest devices** (more phones, smaller shards each) and run a **bigger** model than any single one of them could hold.
 
-**To run a LAN circle:**
+**Important — serve HTTPS on a LAN.** Browsers only expose **WebGPU in a "secure
+context."** `localhost` qualifies even over http, but a plain-http **LAN IP**
+(`http://192.168.x.x`) does **not** — so devices joining a LAN host over http can
+connect, but have **no WebGPU and cannot run inference.** The fix is to serve
+`https` (a self-signed cert is fine); then the LAN IP becomes a secure context and
+WebGPU works on every device.
 
 ```bash
-HOST=0.0.0.0 node server.js                 # bind to the network, not just localhost
-./fetch-demo-model.sh                        # pre-load a model's shards onto this one host
-# everyone on the same network opens:  http://<this-machine-LAN-ip>:8080
+# one-time: make a self-signed cert for this host
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout key.pem -out cert.pem -subj "/CN=osiris-lan"
+
+# serve https+wss on all interfaces, with a demo model pre-loaded
+./fetch-demo-model.sh
+HOST=0.0.0.0 TLS_CERT=cert.pem TLS_KEY=key.pem node server.js   # -> https on :8443
+
+# everyone on the same network opens:  https://<this-machine-LAN-ip>:8443
+# (accept the self-signed warning once per device — that's expected)
 ```
 
-Pre-fetching the shards onto the host machine means peers pull them over the local network (fast), and nothing about the model or your prompts ever touches the internet. **A LAN party of friends pooling their phones to run a 7B together is the sweet spot for this project.**
+Pre-fetching the shards onto the host means peers pull them over the local network (fast), and nothing about the model or your prompts ever touches the internet. **A LAN party of friends pooling their phones to run a 7B together is the sweet spot for this project.**
+
+> No-TLS fallbacks: each device can instead whitelist the origin via
+> `chrome://flags/#unsafely-treat-insecure-origin-as-secure` (manual, per device),
+> or run http and accept that joiners fall back to the slower WASM-CPU path where
+> WebGPU is unavailable. HTTPS is the clean option.
 
 ---
 
@@ -145,6 +162,7 @@ not stored in git). There are three ways to actually run a model:
 |---|---|---|
 | `PORT` | port the signaling + static server listens on | `8080` |
 | `HOST` | interface to bind | `127.0.0.1` (set `0.0.0.0` for other devices on your network) |
+| `TLS_CERT` / `TLS_KEY` | paths to a cert+key to serve **https + wss** (required for WebGPU on a LAN, see above) | — (http if unset; port defaults to 8443 when set) |
 | `TURN_SECRET` | shared secret for time-limited TURN credentials (HMAC-SHA1) | — (TURN off if unset) |
 | `TURN_HOST` / `TURN_PORT` | your coturn relay, for peers behind symmetric NATs | — / `3478` |
 

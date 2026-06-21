@@ -8,3 +8,4 @@ node_modules/
 public/models/
 tools/__pycache__/
 tools/work/
+*.pem
