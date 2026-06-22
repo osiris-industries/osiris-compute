@@ -1003,6 +1003,7 @@ self.onmessage = function(ev){
     onTask(raw){
       let m; try{ m=JSON.parse(raw); }catch(e){ return; }
       if (m.cmd==="shard-assign"){ models.onAssign(m); return; }
+      if (m.cmd==="shard-reset"){ models.onReset(); return; }
       if (m.cmd==="shard-fwd"){ models.onFwd(m); return; }
       if (m.cmd==="work"){ runKernel(m.task, m.epoch, m.chunkId, m.chunk).then(buf=>{ try{ this.channel.send(buf); }catch(e){} this.n++; $("wTiles").textContent=this.n; }); return; }
       if (m.cmd==="chat"){ chatAppend(m.name, m.text, false, false); return; }
@@ -1175,7 +1176,8 @@ self.onmessage = function(ev){
     },
     async setup(){
       if(role!=="host"){ alert("Host a circle and have a device join first — it holds the middle layers."); return; }
-      if(this.busy||this.ready) return;
+      if(this.busy) return;
+      if(this.ready){ await this.teardown(); }
       const M=MODELS[($("mModel")&&$("mModel").value)||"qwen"]; this.M=M;
       const stages=chainOf(M); this.stages=stages;
       const peers=[...host.peers].filter(e=>e[1].channel&&e[1].channel.readyState==="open").map(e=>({id:e[0],name:e[1].name||("peer "+e[0].slice(0,6))}));
@@ -1200,10 +1202,18 @@ self.onmessage = function(ev){
         for(const [pid,sts] of byPeer){ this.mlog("assigning layers "+sts[0].kv[0]+"–"+(sts[sts.length-1].kv[1]-1)+" to "+nm(pid)); host.peers.get(pid).channel.send(JSON.stringify({cmd:"shard-assign", model:M.id, stages:sts})); }
         const ok=await this.waitChain(900000);
         if(!ok){ this.mlog("a stage never reported ready — aborting."); this.busy=false; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; return; }
-        this.ready=true; $("shardBtn").textContent="Pipeline ready ✓ ("+M.id+")"; if($("genBtn")) $("genBtn").disabled=false;
+        this.ready=true; $("shardBtn").textContent="Switch / rebuild model"; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; if($("genBtn")) $("genBtn").disabled=false;
         this.mlog("pipeline ready — "+(M.chat?"ask a question":"type a prompt")+" and hit Generate.");
       }catch(e){ this.mlog("error: "+(e&&e.message||e)); $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; }
       this.busy=false;
+    },
+    async teardown(){
+      this.ready=false; this._allReady=false; if($("genBtn"))$("genBtn").disabled=true;
+      try{ if(this.sessF&&this.sessF.release) await this.sessF.release(); }catch(e){}
+      try{ if(this.sessB&&this.sessB.release) await this.sessB.release(); }catch(e){}
+      this.sessF=null; this.sessB=null; this.tok=null;
+      for(const p of host.peers.values()){ if(p.channel&&p.channel.readyState==="open"){ try{ p.channel.send(JSON.stringify({cmd:"shard-reset"})); }catch(e){} } }
+      this.mlog("released the current pipeline — pick a model and rebuild.");
     },
     waitChain(ms){ return new Promise(res=>{ const t0=performance.now(); const tick=()=>{ if(this._allReady)return res(true); if(performance.now()-t0>ms)return res(false); setTimeout(tick,80); }; tick(); }); },
     onShardReady(){ this._readyCount=(this._readyCount||0)+1; this.mlog("stage node ready ✓ ("+this._readyCount+"/"+this._needPeers+")"); if(this._readyCount>=this._needPeers) this._allReady=true; },
@@ -1247,9 +1257,16 @@ self.onmessage = function(ev){
       }catch(e){ this.mlog("generation error: "+(e&&e.message||e)); }
       this.busy=false; if($("genBtn"))$("genBtn").disabled=false;
     },
+    async onReset(){
+      try{ for(const k in (this.sessByStage||{})){ const s=this.sessByStage[k]; if(s&&s.release) await s.release(); } }catch(e){}
+      this.stageMeta={}; this.sessByStage={}; this.kvByStage={};
+      const wi=$("wShardInfo"); if(wi) wi.textContent="pipeline released by host — standing by";
+      this.mlog("host released the pipeline — your shard was freed");
+    },
     async onAssign(m){
       const M=MODELS[m.model]||MODELS.qwen; this.M=M;
       const stages=(m.stages&&m.stages.length)?m.stages:[{idx:0,file:M.files.mid,kv:M.kvMid,seamIn:M.seamF,seamOut:M.seamM}];
+      try{ for(const k in (this.sessByStage||{})){ const s=this.sessByStage[k]; if(s&&s.release) await s.release(); } }catch(e){}
       this.stageMeta={}; this.sessByStage={}; this.kvByStage={};
       $("wShardStage").classList.remove("hidden");
       $("wShardInfo").textContent=M.id+" — loading "+stages.length+" interior stage(s) on your GPU…";
