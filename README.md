@@ -1,6 +1,7 @@
 # Osiris Compute
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![smoke-test](https://github.com/osiris-industries/osiris-compute/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/osiris-industries/osiris-compute/actions/workflows/smoke-test.yml)
 [![Live demo](https://img.shields.io/badge/live%20demo-compute.osirisindustries.net-orange)](https://compute.osirisindustries.net)
 [![Runtime deps](https://img.shields.io/badge/runtime%20deps-1%20(ws)-success)](package.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
