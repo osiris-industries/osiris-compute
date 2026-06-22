@@ -108,7 +108,7 @@ Pre-fetching the shards onto the host means peers pull them over the local netwo
 
 ---
 
-## For reviewers (DigitalOcean Open Source team)
+## For reviewers
 
 The fastest way to see it work — **no clone, no install:**
 
