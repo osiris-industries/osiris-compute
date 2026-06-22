@@ -8,7 +8,7 @@
   "embed_policy": "int8",
   "max_shard_mb": 900,
   "phone_shard_mb": 900,
-  "mid_layers": 6,
+  "interior_stages": 6,
   "chat": true,
   "stop": 151645,
   "default_prompt": "Write a Python function to reverse a string.",

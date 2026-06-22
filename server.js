@@ -48,6 +48,14 @@ const TURN_HOST = process.env.TURN_HOST || '';
 const TURN_PORT = process.env.TURN_PORT || '3478';
 const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10);
 
+// DoS caps (env-tunable; generous defaults). For a public deployment, also put a
+// rate-limiting reverse proxy in front (e.g. nginx limit_req on /ws).
+const MAX_CONNS = parseInt(process.env.MAX_CONNS || '500', 10);
+const MAX_ROOMS = parseInt(process.env.MAX_ROOMS || '200', 10);
+const MAX_PEERS_PER_ROOM = parseInt(process.env.MAX_PEERS_PER_ROOM || '16', 10);
+// Optional WS origin allowlist (comma-separated). Empty = open (any origin).
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
 const rooms = new Map(); // code -> { host, peers: Map<id,ws>, created }
 
 function logE(...args) { console.log(new Date().toISOString(), ...args); }
@@ -186,6 +194,11 @@ function broadcastRoster(room) {
 }
 
 wss.on('connection', (ws, req) => {
+  if (ALLOWED_ORIGINS.length) {
+    const o = req.headers['origin'] || '';
+    if (!ALLOWED_ORIGINS.includes(o)) { logE('reject-origin', o || '-'); try { ws.close(1008, 'origin'); } catch { /* noop */ } return; }
+  }
+  if (wss.clients.size > MAX_CONNS) { logE('reject-maxconns', wss.clients.size); try { ws.close(1013, 'server busy'); } catch { /* noop */ } return; }
   ws.peerId = randId(8);
   ws.roomId = null; ws.role = null; ws.isAlive = true; ws.caps = null;
   ws.on('pong', () => { ws.isAlive = true; });
@@ -198,6 +211,7 @@ wss.on('connection', (ws, req) => {
     switch (msg.type) {
       case 'create': {
         if (msg.caps && typeof msg.caps === 'object') ws.caps = msg.caps;
+        if (rooms.size >= MAX_ROOMS) { send(ws, { type: 'error', error: 'server-full' }); logE('create REJECTED server-full', rooms.size); break; }
         // a reconnecting host may reclaim its previous code if it is free; else mint a new one
         let code = (typeof msg.roomId === 'string') ? msg.roomId.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) : '';
         if (!code || rooms.has(code)) code = newRoomCode();
@@ -212,6 +226,7 @@ wss.on('connection', (ws, req) => {
         const code = String(msg.roomId || '').toUpperCase().trim();
         const room = rooms.get(code);
         if (!room) { send(ws, { type: 'error', error: 'no-such-room' }); logE('join', code, 'peer', sid(ws.peerId), 'REJECTED'); break; }
+        if (room.peers.size >= MAX_PEERS_PER_ROOM) { send(ws, { type: 'error', error: 'room-full' }); logE('join', code, 'REJECTED room-full', room.peers.size); break; }
         if (msg.caps && typeof msg.caps === 'object') ws.caps = msg.caps;
         ws.roomId = code; ws.role = 'peer';
         room.peers.set(ws.peerId, ws);

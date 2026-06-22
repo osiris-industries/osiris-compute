@@ -17,7 +17,7 @@ Hosts:
   ssh:user@HOST:/remote/dir  worker on a remote box (its venv at <dir>/.venv with
                              --remote-venv); shard scp'd back to the shared workdir.
 """
-import os, sys, json, argparse, subprocess, shutil, time
+import os, sys, json, argparse, subprocess, shutil, time, shlex
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = ["osiris_build_sharded.py", "osiris_build_lean.py", "osiris_build_distributed.py"]
@@ -102,8 +102,11 @@ def dispatch(args, tag, host):
         return subprocess.Popen(cmd, env=env, stdout=log, stderr=subprocess.STDOUT)
     conn, rdir, base, _ = parse_ssh(host)
     py = f"{rdir}/.venv/bin/python" if args.remote_venv else "python3"
-    rargs = " ".join(worker_argv(args, tag, f"{rdir}/work"))
-    rcmd = f"cd {rdir} && HF_HUB_ENABLE_HF_TRANSFER=0 TRANSFORMERS_VERBOSITY=error {py} osiris_build_distributed.py {rargs}"
+    # shlex.quote every interpolated value: prevents shell injection via crafted
+    # --repo/--name/--prompt args AND correctly handles values with spaces.
+    rargs = " ".join(shlex.quote(a) for a in worker_argv(args, tag, f"{rdir}/work"))
+    rcmd = (f"cd {shlex.quote(rdir)} && HF_HUB_ENABLE_HF_TRANSFER=0 TRANSFORMERS_VERBOSITY=error "
+            f"{shlex.quote(py)} osiris_build_distributed.py {rargs}")
     return subprocess.Popen(base + [rcmd], stdout=log, stderr=subprocess.STDOUT)
 
 

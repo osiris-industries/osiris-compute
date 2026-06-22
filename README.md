@@ -160,8 +160,9 @@ not stored in git). There are three ways to actually run a model:
    `qwen` uses one interior shard, so only one peer does interior work; **`qwen15dist`
    has 6**, so the circle auto-distributes them across however many phones join (1
    phone holds all 6, 2 phones → 3 each, … up to 6 phones → one each).
-3. **Build your own** from any HuggingFace model with the partitioning toolchain in
-   [`tools/`](tools/). The K-way builder (`osiris_build_lean.py --interior K`) splits
+3. **Build your own** with the partitioning toolchain in [`tools/`](tools/)
+   (validated end-to-end on the **Qwen2.5 family**; other architectures are templates
+   that need adaptation — see [tools/README](tools/README.md)). The K-way builder (`osiris_build_lean.py --interior K`) splits
    a model into K interior shards — one per device — without needing a big box, and
    `osiris_build_distributed.py` farms that build across machines. See
    [tools/README.md](tools/README.md).

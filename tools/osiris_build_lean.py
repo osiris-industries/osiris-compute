@@ -20,7 +20,11 @@ Usage:
      --front 2 --back 2 --interior 6 --embed-policy fp16 \
      --id qwen15lean --name "Qwen2.5-1.5B (lean-built)" [--no-quant] [--no-verify]
 """
-import os, sys, json, gc, argparse, resource
+import os, sys, json, gc, argparse
+try:
+    import resource   # Unix-only; absent on Windows
+except ImportError:
+    resource = None
 import numpy as np
 
 from osiris_build_sharded import (build_wrapper_classes, plan_stages,
@@ -28,6 +32,8 @@ from osiris_build_sharded import (build_wrapper_classes, plan_stages,
 
 
 def rss_gb():
+    if resource is None:
+        return 0.0
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 ** 2)
 
 
@@ -84,7 +90,17 @@ def lean_load_stage(config, keymap, lo, hi, role, tied, embed_fp16=False):
     with torch.device("meta"):
         model = AutoModelForCausalLM.from_config(config)
     model.eval()
-    want = [k for k in needed_keys(lo, hi, role, tied) if k in keymap]
+    needed = needed_keys(lo, hi, role, tied)
+    want = [k for k in needed if k in keymap]
+    # strict=False + assign=True load nothing silently if tensor names don't match.
+    # Fail loudly on missing WEIGHT tensors (biases are legitimately absent on Llama/Mistral).
+    missing_w = [k for k in needed if k not in keymap and k.endswith('.weight')]
+    if missing_w:
+        raise RuntimeError(
+            f"lean_load_stage: {len(missing_w)} expected weight tensors are not in the checkpoint "
+            f"(e.g. {missing_w[:3]}). The tensor names don't match the Qwen2/Llama layout this builder "
+            f"assumes. This builder is validated on the Qwen2.5 family; other architectures need adaptation "
+            f"(tensor names, RoPE, EOS) before they will produce correct shards.")
     byfile = {}
     for k in want:
         byfile.setdefault(keymap[k], []).append(k)

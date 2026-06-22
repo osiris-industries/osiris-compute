@@ -9,6 +9,13 @@ Only a few **kilobytes of hidden-state** travel device→device per token; the w
 never move once placed. That is what lets a model too big for any single device run
 across a laptop plus a handful of phones.
 
+> **Model support — be precise.** This is validated end-to-end on the **Qwen2.5 family**
+> (0.5B / 1.5B / 3B / 14B), which is what the live demo ships. The seam logic assumes the
+> Qwen2/Llama tensor layout and currently uses Qwen RoPE + EOS, so **Llama / Mistral / Gemma
+> configs are starting-point templates, not turnkey** — they need RoPE, EOS-token, and
+> tensor-name adaptation. The lean builder now **fails loudly** if a checkpoint's tensor
+> names don't match, rather than silently emitting a broken shard.
+
 ## The pipeline
 
 ```
@@ -55,7 +62,7 @@ Config-driven, K-way interior split (one interior shard per peer/phone). It:
 - applies the embedding quant policy (`fp16` | `int8`) on FRONT,
 - optionally bakes an fp16 head on BACK (`bake_head:false` for untied/int4 heads, e.g. Mistral/Llama),
 - emits external-data ONNX for shards over the 2GB protobuf limit,
-- **CPU-verifies** the chain end-to-end (FRONT → MID0 → … → BACK still answers),
+- **CPU smoke-tests** the chain end-to-end (FRONT → MID0 → … → BACK runs and decodes coherent text — a sanity check that the wiring/seams are intact, **not** a full logit-equivalence proof; see "What \"verified\" means" below),
 - prints the client `MODELS` registry entry and `<option>`.
 
 ```bash
@@ -83,8 +90,9 @@ already-exported `model_q4.onnx` (e.g. to change the interior shard count).
 | `chat` / `chat_template` / `stop` | chat formatting and stop token(s) |
 | `default_prompt` / `def_temp` / `ep` | demo prompt, sampling temperature, ORT execution providers |
 
-The included configs (`qwen15`, `qwen3b`, `mistral7b`, `llama3b`, `gemma2-2b`,
-`qwen14b`) are working examples across several architectures.
+The included configs span several architectures, but only the **Qwen2.5** ones
+(`qwen15`, `qwen3b`, `qwen14b`) are validated end-to-end; `mistral7b`, `llama3b`, and
+`gemma2-2b` are **templates** needing the per-architecture adaptation noted at the top.
 
 ## Serving the shards
 
@@ -105,12 +113,21 @@ model, so a 16GB box can build a 14B and a tiny box can build a 1.5B.
 Files:
 - `osiris_build_sharded.py` — the exact-correctness core: exports one contiguous
   stage (FRONT / interior_j / BACK) to ONNX with the shard I/O contract, and proves
-  a chained re-export reproduces the full model's logits.
+  **numerical logit-equivalence** (chained shards vs the unsharded model) on a small
+  model, on a **prefill** pass. This is the real correctness guarantee in the toolchain.
 - `osiris_build_lean.py` — **the K-way partitioner.** Meta-device skeleton + partial
   safetensors load of only a stage's layers → export → int4-quant → emit the client
   registry block. `--interior K` controls how many interior shards (one per phone).
 - `osiris_build_distributed.py` — farm the K stages across machines (`--hosts
   local | ssh:user@host:/dir`), round-robin, scp shards back. No merge step.
+
+> **What "verified" means (so it isn't oversold):** `osiris_build_sharded.py` proves
+> *numerical* equivalence (prefill logits match the unsharded model) on a small model.
+> `osiris_build_lean.py` / `osiris_build_distributed.py` instead run a **greedy-generation
+> smoke test** through the quantized shard chain: it confirms the chain loads, the seams
+> line up, and it decodes coherent text — but it does **not** re-compare logits against
+> the full model on the autoregressive decode path. Treat a clean lean build as "wired
+> correctly + int4-coherent," and the Phase-0 `sharded` proof as the equivalence guarantee.
 
 Build a model split into K interior shards on ONE box:
 ```bash

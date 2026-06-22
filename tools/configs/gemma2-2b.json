@@ -1,5 +1,5 @@
 {
-  "id": "gemma2b",
+  "id": "gemma2-2b",
   "name": "Gemma-2-2B-it",
   "hf_repo": "onnx-community/gemma-2-2b-it",
   "onnx_file": "onnx/model_q4.onnx",
@@ -8,7 +8,7 @@
   "embed_policy": "int8",
   "max_shard_mb": 900,
   "phone_shard_mb": 300,
-  "mid_layers": 3,
+  "interior_stages": 3,
   "chat": true,
   "stop": 107,
   "default_prompt": "What is the capital of France?",
