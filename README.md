@@ -46,7 +46,7 @@ Osiris Compute can run a language model **too big for any single device** by spl
 - Each generated token, only a few **kilobytes of hidden-state** travel device → device — not the weights.
 - Placement is capability-aware: strong devices anchor, weak devices hold a slice.
 
-The live grid currently serves several models this way — from Qwen2.5-0.5B up to **Mistral-7B-Instruct split across a host + 6 interior shards**, with coherent generation across machines that could never each hold the whole model.
+The live grid serves several models this way. The stable multi-device demo is **Qwen2.5-1.5B split into 6 interior shards** (`qwen15dist`) — it spreads across up to six phones — while **Mistral-7B** (host + 6 interior shards) is the larger target, currently in active testing. Even the small models generate coherently across machines that could never each hold the whole model.
 
 > **Status note:** the larger **Mistral-7B** distributed implementation is **under active testing** right now — multi-shard pipelines at that size are still being hardened, so expect rough edges on that specific model. The smaller models (Qwen2.5-0.5B / 1.5B, distilgpt2) are the stable, reliable demos.
 
@@ -111,8 +111,8 @@ Pre-fetching the shards onto the host means peers pull them over the local netwo
 
 The fastest way to see it work — **no clone, no install:**
 
-1. Open **https://compute.osirisindustries.net** in **desktop Chrome or Edge** (WebGPU is required; Safari/Firefox and most mobile browsers won't run the inference path yet).
-2. Open the **same link in a second tab** (or on a second device) — that forms a two-peer circle. The signaling server even hands out a TURN relay, so peers on different networks can connect.
+1. Open **https://compute.osirisindustries.net** in **desktop Chrome or Edge** for the host/anchor (WebGPU required). **Phones can join as interior nodes** — recent iOS Safari and Android Chrome ship WebGPU, so a phone really does hold and compute its own layers (that's the headline capability). Browsers without WebGPU can still join the circle but won't compute.
+2. Open the **same link in a second tab** (or on a second device) — that forms a two-peer circle. The hosted grid runs a TURN relay so peers on different networks can connect; a **self-hosted** server has TURN **off by default** (LAN + public STUN still work — supply your own relay for hostile NATs, see Configuration).
 3. Pick a model and run it. **Start with `Qwen2.5-0.5B` or `distilgpt2`** — they're small, so the shards load in seconds and you'll see tokens stream across the circle almost immediately. Larger models download more weight to the browser first, so give them a moment.
 
 A few honest expectations:
@@ -187,7 +187,7 @@ public/index.html    the client — WebRTC mesh, WASM/WebGPU sandbox, model regi
 public/wabt.js       vendored WebAssembly Binary Toolkit (Apache-2.0; see NOTICE)
 fetch-demo-model.sh  pull a small demo model's shards from the public grid into public/models/
 tools/               model partitioning toolchain (HF model → browser-ready FRONT/interior/BACK shards)
-tools/configs/       example model configs (qwen, mistral7b, llama3b, gemma2-2b, …)
+tools/configs/       example model configs (qwen15, qwen3b, mistral7b, llama3b, gemma2-2b, qwen14b)
 ```
 
 Model **shards** (the `.onnx` files) are large and served as static assets
