@@ -9,5 +9,4 @@ onnxruntime
 onnxscript
 safetensors
 huggingface_hub
-accelerate
 numpy

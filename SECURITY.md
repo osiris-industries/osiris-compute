@@ -24,7 +24,7 @@ before going public.
 - **The general-compute feature runs peer-supplied code** (JS in a Web Worker, or WASM/WGSL).
   The Worker has no filesystem or page/DOM access, but it **can make network requests** — so it
   is NOT a full capability sandbox. A peer's module only runs **after the receiving user
-  explicitly approves it** (consent prompt, default deny). Treat a circle as "compute among
+  explicitly approves it** (consent prompt, default deny; approval is **per circle** — one OK covers that circle's session, not each individual module). Treat a circle as "compute among
   people you trust," not "run anonymous strangers' code safely."
 - Browser-origin boundaries (no host filesystem access, same-origin policy) still apply to all paths.
 - **The coordination server only does WebRTC signaling** (SDP/ICE exchange) and roster
