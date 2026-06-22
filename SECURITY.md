@@ -21,6 +21,11 @@ before going public.
 
 - **LLM inference is data-only**: model shards run through onnxruntime-web (WebGPU/WASM);
   no peer-supplied code executes for the inference path.
+- **Model shards are not integrity-checked.** The browser runtime (onnxruntime-web) is pinned
+  with an SRI hash, but the model `.onnx` shards a host serves to peers are not hashed — a
+  malicious host can serve an attacker-chosen (still data-only) graph that a peer's ORT will load.
+  Same trust assumption as the rest of a circle: join circles run by people you trust. Per-shard
+  hashing is a planned hardening.
 - **The general-compute feature runs peer-supplied code** (JS in a Web Worker, or WASM/WGSL).
   The Worker has no filesystem or page/DOM access, but it **can make network requests** — so it
   is NOT a full capability sandbox. A peer's module only runs **after the receiving user

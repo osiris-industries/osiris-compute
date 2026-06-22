@@ -176,7 +176,7 @@
         <div class="row" style="margin-bottom:4px">
           <div>
             <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Models — run a model too big for one device</h2>
-            <p class="muted">Split a model&#39;s <em>layers</em> across the circle (pipeline parallelism). The heavy embedding &amp; head run on capable devices; phones hold interior layers. Each token, only a few KB of <code>hidden_states</code> travel device&#8594;device. Placement is capability-aware.</p>
+            <p class="muted">Split a model&#39;s <em>layers</em> across the circle (pipeline parallelism). The heavy embedding &amp; head run on capable devices; phones hold interior layers. Each token, only a few KB of <code>hidden_states</code> travel device&#8594;device. The host holds the heavy embedding &amp; head; interior stages are placed capability-aware (stronger devices take proportionally more).</p>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <select id="mModel" style="background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:9px;font:inherit;font-size:13px">
@@ -517,6 +517,14 @@ self.onmessage = function(ev){
   }
   function specSummary(s){ if (!s) return "specs n/a";
     return (s.cores?s.cores+" cores":"? cores")+" · "+(s.mem?s.mem+"GB RAM":"RAM n/a")+" · "+(s.gpu||"GPU n/a"); }
+  function capScore(s){
+    if (!s) return 1;
+    const soft = /(swiftshader|llvmpipe|software|microsoft basic)/i.test(s.gpu||"");
+    const gpu = (s.gpu && s.gpu!=="unknown" && !soft) ? 3 : 1;   // a real GPU weighs heavily
+    const mem = Math.max(1, Math.min(8, s.mem||2));
+    const cores = Math.max(1, Math.min(16, s.cores||2));
+    return gpu * (mem + cores/4);
+  }
 
   // =========================================================================
   // TASK REGISTRY — host-side chunking + integration. Kernels live in the worker.
@@ -1096,6 +1104,9 @@ self.onmessage = function(ev){
         {file:"qMID5.onnx", kv:[23,27], seamIn:"/model/layers.22/Add_1_output_0", seamOut:"/model/layers.26/Add_1_output_0"}
       ],
       chat:true, stop:2, chatTemplate:"<s>[INST] {user} [/INST]", defaultPrompt:"Write a haiku about distributed computing.", defTemp:0.3, ep:["webgpu"], memPattern:false },
+    // qwen3b + qwen15n are hand-seamed preloaded demo entries (multi-tensor / custom splits):
+    // they run on the hosted demo but are NOT reproducible from the published single-seam
+    // osiris_partition.py — use osiris_build_lean.py to build your own reproducibly.
     qwen3b: { id:"qwen3b", name:"Qwen2.5-Coder-3B-Instruct (fp32, 2-tensor seam)", base:"/models/qwen3b/",
       files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
       seamF:["/model/layers.5/post_attention_layernorm/output_3","/model/layers.5/mlp/down_proj/MatMul/output_0"], seamM:["/model/layers.18/post_attention_layernorm/output_3","/model/layers.18/mlp/down_proj/MatMul/output_0"],
@@ -1221,7 +1232,12 @@ self.onmessage = function(ev){
       const peers=[...host.peers].filter(e=>e[1].channel&&e[1].channel.readyState==="open").map(e=>({id:e[0],name:e[1].name||("peer "+e[0].slice(0,6))}));
       if(!peers.length){ this.mlog("Need at least one other device in the circle. Share the link, have a phone or laptop join, then try again."); return; }
       this.busy=true; $("shardBtn").disabled=true; if($("mModel")) $("mModel").disabled=true;
-      this.placement=stages.map((s,j)=>peers[Math.min(peers.length-1, Math.floor(j*peers.length/stages.length))].id);
+      // capability-aware placement: stronger peers (GPU/RAM/cores) get proportionally more
+      // interior stages. Degrades to an even split when peers are comparable; a single peer
+      // trivially holds every stage (identical to before).
+      const scored=peers.map(p=>({id:p.id, w:capScore(host.specs.get(p.id))}));
+      const totW=scored.reduce((a,b)=>a+b.w,0)||scored.length;
+      this.placement=stages.map((s,j)=>{ const frac=((j+0.5)/stages.length)*totW; let acc=0; for(const p of scored){ acc+=p.w; if(frac<=acc) return p.id; } return scored[scored.length-1].id; });
       const byPeer=new Map();
       stages.forEach((s,j)=>{ const pid=this.placement[j]; if(!byPeer.has(pid)) byPeer.set(pid,[]); byPeer.get(pid).push({idx:j,file:s.file,kv:s.kv,seamIn:s.seamIn,seamOut:s.seamOut}); });
       const nm=pid=>{ const pr=peers.find(p=>p.id===pid); return pr?pr.name:"?"; };

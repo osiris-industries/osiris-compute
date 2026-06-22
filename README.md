@@ -44,7 +44,7 @@ Osiris Compute can run a language model **too big for any single device** by spl
 - The heavy **embedding + head** run on capable "anchor" devices (a laptop/desktop).
 - The **interior transformer layers** are sliced into shards that phones can each hold.
 - Each generated token, only a few **kilobytes of hidden-state** travel device → device — not the weights.
-- Placement is capability-aware: strong devices anchor, weak devices hold a slice.
+- Placement is capability-aware: the host anchors the heavy embedding + head, and interior stages are distributed across peers weighted by each device's GPU/RAM/cores (stronger devices take proportionally more).
 
 The live grid serves several models this way. The stable multi-device demo is **Qwen2.5-1.5B split into 6 interior shards** (`qwen15dist`) — it spreads across up to six phones — while **Mistral-7B** (host + 6 interior shards) is the larger target, currently in active testing. Even the small models generate coherently across machines that could never each hold the whole model.
 
