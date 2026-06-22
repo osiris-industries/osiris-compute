@@ -199,7 +199,7 @@
         <div style="margin-top:12px">
           <textarea id="mPrompt" spellcheck="false" placeholder="set up the pipeline, then ask anything…" style="width:100%;min-height:54px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:10px;font:inherit;font-size:14px;text-transform:none;letter-spacing:0">The future of distributed computing is</textarea>
           <div class="row" style="margin-top:8px">
-            <label style="color:var(--ink-soft);font-size:13px">max new tokens <input id="mMax" type="number" value="40" min="1" max="64" style="width:64px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
+            <label style="color:var(--ink-soft);font-size:13px">max new tokens <input id="mMax" type="number" value="40" min="1" max="1024" style="width:64px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
             <label style="color:var(--ink-soft);font-size:13px;margin-left:10px">temp <input id="mTemp" type="number" value="0.8" min="0" max="1.5" step="0.1" style="width:56px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
             <button class="btn" id="genBtn" disabled>Generate</button>
           </div>
@@ -1285,7 +1285,7 @@ self.onmessage = function(ev){
       const text=(($("mPrompt")&&$("mPrompt").value)||"").trim();
       if(!text){ this.mlog("type a prompt first."); return; }
       let ids=buildPrompt(M,this.tok,text); if(!ids.length){ this.mlog("couldn't tokenize."); return; }
-      const maxNew=Math.max(1,Math.min(96,parseInt(($("mMax")&&$("mMax").value)||"40",10)||40));
+      const maxNew=Math.max(1,Math.min(1024,parseInt(($("mMax")&&$("mMax").value)||"40",10)||40));
       this.temp=Math.max(0,parseFloat(($("mTemp")&&$("mTemp").value)||String(M.defTemp)));
       this.busy=true; if($("genBtn"))$("genBtn").disabled=true; $("mTps").textContent="…";
       const tokens=[...ids], gen=[]; let last=null;
