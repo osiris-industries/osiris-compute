@@ -120,6 +120,7 @@ A few honest expectations:
 - **First model load downloads its shards** to the browser, so there's a brief wait before the first token (smaller model = faster).
 - **Latency over the public internet is the cost center** (see [Run it on a LAN](#run-it-on-a-lan--the-fast-path-)) — on a shared local network it gets *much* faster, approaching data-center behavior. That's the headline use case for the self-host release.
 - **Mistral-7B is mid-testing** (see the status note above) — for a clean first impression, use a small model.
+- **Network drops recover automatically for the *connection*, not for an in-flight answer.** The signaling socket reconnects with backoff and rejoins the same circle (the host keeps its code), and peers re-link via WebRTC on their own; shard downloads retry on a transient blip. But if a peer drops *while a token is generating*, that token's pipeline state is gone — the run fails fast with a clear message and you re-run the prompt (or rebuild if the peer set changed). Full mid-inference resume across a dropped peer is out of scope for this release.
 
 Happy to give a live walkthrough across a couple of your own devices — just reach out to **admin@osirisindustries.net**.
 

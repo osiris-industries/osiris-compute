@@ -198,7 +198,9 @@ wss.on('connection', (ws, req) => {
     switch (msg.type) {
       case 'create': {
         if (msg.caps && typeof msg.caps === 'object') ws.caps = msg.caps;
-        const code = newRoomCode();
+        // a reconnecting host may reclaim its previous code if it is free; else mint a new one
+        let code = (typeof msg.roomId === 'string') ? msg.roomId.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) : '';
+        if (!code || rooms.has(code)) code = newRoomCode();
         rooms.set(code, { host: ws, peers: new Map(), created: Date.now() });
         ws.roomId = code; ws.role = 'host';
         send(ws, { type: 'created', roomId: code, selfId: ws.peerId });

@@ -370,6 +370,7 @@ self.onmessage = function(ev){
   let ICE = { iceServers: [ { urls: "stun:stun.l.google.com:19302" } ] };
   const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
   let ws, selfId, roomId, role = null, wakeLock = null, selectedTask = "mandelbrot";
+  let reconnectTimer=null, reconnectAttempts=0, intentionalClose=false, joinRetries=0;
 
   // ---- chat + presence (rides the existing data channel; star topology, host relays) ----
   const ADJ=["swift","calm","bright","bold","quiet","keen","brave","wry","lucid","sly"];
@@ -593,11 +594,21 @@ self.onmessage = function(ev){
   // ---- WebSocket signaling ----
   function connect(){
     ws=new WebSocket(WS_URL);
-    ws.onopen=()=>{ $("connDot").classList.add("on"); $("connText").textContent="connected — ready";
-      const pre=new URLSearchParams(location.search).get("room"); if (pre){ $("joinCode").value=pre.toUpperCase(); doJoin(pre); } };
-    ws.onclose=()=>{ $("connDot").classList.remove("on"); $("connText").textContent="disconnected — refresh to reconnect"; };
-    ws.onerror=()=>{ $("connText").textContent="signaling error — refresh"; };
+    ws.onopen=()=>{ reconnectAttempts=0; if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null; } $("connDot").classList.add("on");
+      if (role==="host" && roomId){ $("connText").textContent="reconnected — restoring circle…"; for(const p of host.peers.values()){ try{ p.pc&&p.pc.close(); }catch(e){} } host.peers.clear(); if(host.refreshDevices) host.refreshDevices(); sig({type:"create", roomId:roomId}); }
+      else if (role==="worker" && roomId){ $("connText").textContent="reconnected — rejoining circle…"; joinRetries=0; sig({type:"join", roomId:roomId}); }
+      else { $("connText").textContent="connected — ready"; const pre=new URLSearchParams(location.search).get("room"); if (pre){ $("joinCode").value=pre.toUpperCase(); doJoin(pre); } } };
+    ws.onclose=()=>{ $("connDot").classList.remove("on"); if (intentionalClose){ $("connText").textContent="disconnected"; return; } scheduleReconnect(); };
+    ws.onerror=()=>{ try{ ws.close(); }catch(e){} };
     ws.onmessage=ev=>handle(JSON.parse(ev.data));
+  }
+  function scheduleReconnect(){
+    if (reconnectTimer) return;
+    reconnectAttempts++;
+    const delay=Math.min(15000, Math.round(500*Math.pow(1.7, Math.min(reconnectAttempts,8))));
+    const inCircle=(role==="host"||role==="worker");
+    $("connText").textContent=(inCircle?"connection lost — reconnecting":"disconnected — retrying")+"… (try "+reconnectAttempts+")";
+    reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connect(); }, delay);
   }
   function sig(obj){ ws.send(JSON.stringify(obj)); }
   function handle(m){
@@ -611,7 +622,14 @@ self.onmessage = function(ev){
       case "error": onError(m); break;
     }
   }
-  function onError(m){ if (role===null){ alert("Could not join: "+m.error+(m.error==="no-such-room"?"\n\nCheck the code, or the host may have closed the circle.":"")); } }
+  function onError(m){
+    if (m.error==="no-such-room" && role==="worker" && roomId){
+      joinRetries=(joinRetries||0)+1;
+      if (joinRetries<=12){ $("connText").textContent="waiting for host to return… (try "+joinRetries+")"; setTimeout(()=>{ if (ws&&ws.readyState===ws.OPEN) sig({type:"join", roomId:roomId}); }, 2000); return; }
+      $("connText").textContent="host did not return — refresh to start over"; return;
+    }
+    if (role===null){ alert("Could not join: "+m.error+(m.error==="no-such-room"?"\n\nCheck the code, or the host may have closed the circle.":"")); }
+  }
 
   function makeIceQueue(pc){
     const q=[]; let ready=false;
@@ -978,6 +996,7 @@ self.onmessage = function(ev){
     onJoined(m){
       this.hostId=m.hostId; $("wRoomCode").textContent=m.roomId;
       this.setStatus("joined — waiting for host offer","warn"); log($("workerLog"),"joined room "+m.roomId+" — waiting for host offer");
+      try{ if(this.pc) this.pc.close(); }catch(e){}
       this.pc=new RTCPeerConnection(ICE); this.q=makeIceQueue(this.pc);
       this.pc.onicecandidate=e=>{ if (e.candidate) sig({type:"signal",to:this.hostId,data:{candidate:e.candidate}}); };
       this.pc.oniceconnectionstatechange=()=>{ const s=this.pc.iceConnectionState; $("wLink").textContent=s; log($("workerLog"),"ICE: "+s);
@@ -1030,7 +1049,7 @@ self.onmessage = function(ev){
         return;
       }
     },
-    onHostLeft(){ this.setStatus("host left","bad"); log($("workerLog"),"host closed the circle"); }
+    onHostLeft(){ this.setStatus("host left — waiting for host to return","bad"); log($("workerLog"),"host closed the circle — will rejoin if it returns"); if(role==="worker"&&roomId){ joinRetries=0; if(ws&&ws.readyState===ws.OPEN) sig({type:"join", roomId:roomId}); } }
   };
 
   function onSignal(m){ if (role==="host") host.onSignalData(m.from, m.data); else if (role==="worker") worker.onSignalData(m.data); }
@@ -1044,7 +1063,7 @@ self.onmessage = function(ev){
     $("sEngine").textContent="detecting…"; gpu().then(g=>{ $("sEngine").textContent=(g?"WebGPU":"CPU")+" · "+HW+(HW>1?" workers":" worker"); });
     scene.start(); lab.load();
   }
-  function onJoined(m){ role="worker"; selfId=m.selfId; roomId=m.roomId; OUT={cv:"wCanvas", out:"wOut"};
+  function onJoined(m){ role="worker"; selfId=m.selfId; roomId=m.roomId; joinRetries=0; OUT={cv:"wCanvas", out:"wOut"};
     $("landing").classList.add("hidden"); $("workerView").classList.remove("hidden"); $("chat").classList.remove("hidden"); $("chatName").value=myName; worker.onJoined(m); }
   function doJoin(code){ sig({type:"join", roomId:String(code).toUpperCase().trim()}); }
 
@@ -1160,7 +1179,23 @@ self.onmessage = function(ev){
     b2s(b64){ const u=b64ToU8(b64); return new Float32Array(u.buffer,0,u.length>>2); },
     tbytes(t){ return abToB64(new Uint8Array(t.data.buffer, t.data.byteOffset, t.data.byteLength)); },
     tmake(b64,type){ const u=b64ToU8(b64); const data = type==="float16" ? new Uint16Array(u.buffer,0,u.length>>1) : new Float32Array(u.buffer,0,u.length>>2); return new this.ort.Tensor(type, data, [1,1,data.length]); },
-    sess(url){ return this.ort.InferenceSession.create(url,{executionProviders:(this.M&&this.M.ep)||["webgpu"],graphOptimizationLevel:"all",enableMemPattern:!(this.M&&this.M.memPattern===false)}); },
+    async sess(url){
+      const opts={executionProviders:(this.M&&this.M.ep)||["webgpu"],graphOptimizationLevel:"all",enableMemPattern:!(this.M&&this.M.memPattern===false)};
+      let lastErr;
+      for(let attempt=1;attempt<=5;attempt++){
+        try{ return await this.ort.InferenceSession.create(url,opts); }
+        catch(e){ lastErr=e; if(attempt<5){ this.mlog("load of "+url.split("/").pop()+" failed (try "+attempt+"/5): "+((e&&e.message)||e)+" — retrying…"); await new Promise(r=>setTimeout(r, Math.min(8000, 700*attempt*attempt))); } }
+      }
+      throw lastErr;
+    },
+    async fetchJSON(url){
+      let lastErr;
+      for(let attempt=1;attempt<=5;attempt++){
+        try{ const r=await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }
+        catch(e){ lastErr=e; if(attempt<5) await new Promise(r=>setTimeout(r, 600*attempt)); }
+      }
+      throw lastErr;
+    },
     feed(sess,pool){ const f={}; for(const nm of sess.inputNames){ if(pool[nm]!==undefined) f[nm]=pool[nm]; } return f; },
     sample(logits){
       const d=logits.data, V=logits.dims[2], base=(logits.dims[1]-1)*V, temp=this.temp;
@@ -1197,7 +1232,7 @@ self.onmessage = function(ev){
         this.mlog("loading FRONT ("+M.files.front+")…"); this.sessF=await this.sess(M.base+M.files.front);
         this.mlog("FRONT loaded ✓ — loading BACK ("+M.files.back+")…"); this.sessB=await this.sess(M.base+M.files.back);
         this.mlog("BACK loaded ✓");
-        this.tok=tokFactory(await(await fetch(M.base+M.files.tok)).json());
+        this.tok=tokFactory(await this.fetchJSON(M.base+M.files.tok));
         this._readyCount=0; this._needPeers=byPeer.size; this._allReady=false;
         for(const [pid,sts] of byPeer){ this.mlog("assigning layers "+sts[0].kv[0]+"–"+(sts[sts.length-1].kv[1]-1)+" to "+nm(pid)); host.peers.get(pid).channel.send(JSON.stringify({cmd:"shard-assign", model:M.id, stages:sts})); }
         const ok=await this.waitChain(900000);
@@ -1217,10 +1252,15 @@ self.onmessage = function(ev){
     },
     waitChain(ms){ return new Promise(res=>{ const t0=performance.now(); const tick=()=>{ if(this._allReady)return res(true); if(performance.now()-t0>ms)return res(false); setTimeout(tick,80); }; tick(); }); },
     onShardReady(){ this._readyCount=(this._readyCount||0)+1; this.mlog("stage node ready ✓ ("+this._readyCount+"/"+this._needPeers+")"); if(this._readyCount>=this._needPeers) this._allReady=true; },
-    askStage(j,step,token,seqlen,carry){ return new Promise(res=>{ this.stageResolver=res;
+    askStage(j,step,token,seqlen,carry){ return new Promise((res,rej)=>{
+      const peer=host.peers.get(this.placement[j]);
+      if(!peer||!peer.channel||peer.channel.readyState!=="open"){ rej(new Error("a stage peer dropped — rebuild the pipeline to re-place its layers")); return; }
+      this.stageResolver=res;
+      this._stageTO=setTimeout(()=>{ if(this.stageResolver===res){ this.stageResolver=null; rej(new Error("stage timed out — a peer became unreachable")); } }, 30000);
       const seams=carry.map(t=>({bytes:this.tbytes(t),type:t.type}));
-      host.peers.get(this.placement[j]).channel.send(JSON.stringify({cmd:"shard-fwd",stageIdx:j,step:step,token:token,seqlen:seqlen,seams:seams})); }); },
-    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; r((m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32"))); } },
+      try{ peer.channel.send(JSON.stringify({cmd:"shard-fwd",stageIdx:j,step:step,token:token,seqlen:seqlen,seams:seams})); }
+      catch(e){ clearTimeout(this._stageTO); this.stageResolver=null; rej(e); } }); },
+    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; if(this._stageTO){ clearTimeout(this._stageTO); this._stageTO=null; } r((m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32"))); } },
     async generate(){
       if(!this.ready||this.busy) return; const M=this.M;
       const text=(($("mPrompt")&&$("mPrompt").value)||"").trim();
