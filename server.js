@@ -97,16 +97,42 @@ function handler(req, res) {
   if (rel === '/' || rel === '\\' || rel === '') rel = '/index.html';
   const filePath = path.join(PUBLIC_DIR, rel);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('forbidden'); }
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
+  fs.stat(filePath, (err, st) => {
+    if (err || !st.isFile()) {
+      // SPA fallback: unknown path -> index.html
       return fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (e2, shell) => {
         if (e2) { res.writeHead(404); return res.end('not found'); }
         res.writeHead(200, { 'content-type': TYPES['.html'] }); res.end(shell);
       });
     }
-    const ext = path.extname(filePath);
-    res.writeHead(200, { 'content-type': TYPES[ext] || 'application/octet-stream' });
-    res.end(data);
+    const ctype = TYPES[path.extname(filePath)] || 'application/octet-stream';
+    const total = st.size;
+    // HTTP Range: lets big shards (.onnx) stream and resume after a dropped connection
+    const range = req.headers['range'];
+    let m;
+    if (range && (m = /^bytes=(\d*)-(\d*)$/.exec(range.trim()))) {
+      let start = m[1] === '' ? null : parseInt(m[1], 10);
+      let end = m[2] === '' ? null : parseInt(m[2], 10);
+      if (start === null) { start = Math.max(0, total - (end || 0)); end = total - 1; }  // suffix: bytes=-N
+      else if (end === null || end >= total) { end = total - 1; }                          // open-ended
+      if (Number.isNaN(start) || start > end || start >= total) {
+        res.writeHead(416, { 'content-range': `bytes */${total}`, 'accept-ranges': 'bytes' });
+        return res.end();
+      }
+      res.writeHead(206, {
+        'content-type': ctype, 'accept-ranges': 'bytes',
+        'content-range': `bytes ${start}-${end}/${total}`,
+        'content-length': end - start + 1, 'cache-control': 'no-cache',
+      });
+      if (req.method === 'HEAD') return res.end();
+      const stream = fs.createReadStream(filePath, { start, end });
+      stream.on('error', () => res.destroy()); stream.pipe(res);
+      return;
+    }
+    res.writeHead(200, { 'content-type': ctype, 'accept-ranges': 'bytes', 'content-length': total });
+    if (req.method === 'HEAD') return res.end();
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => res.destroy()); stream.pipe(res);
   });
 }
 
