@@ -33,6 +33,11 @@ before going public.
 - **Circles are trust-scoped.** You share a link with people you choose; the model is
   "compute among peers you trust," not "open compute for anonymous strangers." Treat a
   circle link like any other shared secret.
+- **Room codes are the only access secret (zero-trust by design).** There is no per-host
+  ownership token: automatic host-reconnect reclaims a code only while it is free, but a
+  consequence is that if a host drops, anyone who *already knows* the code could recreate it
+  during the gap and adopt returning peers. Same mitigation as any shared secret — don't post
+  circle links publicly, and start a fresh circle if a link leaks.
 - **TURN credentials are time-limited** (HMAC-SHA1 over an expiry) and are never
   committed to the repo; they are minted by the server from an environment secret.
 - **No secrets in the repository.** Relay credentials, tokens, and host config are

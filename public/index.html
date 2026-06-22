@@ -184,7 +184,7 @@
               <option value="qwen15">Qwen2.5-1.5B-Instruct — bigger, answers questions</option>
               <option value="qwen15n">Qwen2.5-1.5B — 3-device chain (2 stages)</option>
               <option value="qwen3b">Qwen2.5-Coder-3B-Instruct</option>
-              <option value="mistral7b">Mistral-7B-Instruct-v0.3 — distributed</option>
+              <!-- Mistral-7B hidden from the picker until logit-equivalence is validated (Qwen RoPE/EOS assumed) -->
               <option value="qwen15dist">Qwen2.5-1.5B — distributed-built, 6-shard chain (up to 6 phones)</option>
             </select>
             <button class="btn" id="shardBtn">Set up the model pipeline</button>
@@ -600,7 +600,7 @@ self.onmessage = function(ev){
       else { $("connText").textContent="connected — ready"; const pre=new URLSearchParams(location.search).get("room"); if (pre){ $("joinCode").value=pre.toUpperCase(); doJoin(pre); } } };
     ws.onclose=()=>{ $("connDot").classList.remove("on"); if (intentionalClose){ $("connText").textContent="disconnected"; return; } scheduleReconnect(); };
     ws.onerror=()=>{ try{ ws.close(); }catch(e){} };
-    ws.onmessage=ev=>handle(JSON.parse(ev.data));
+    ws.onmessage=ev=>{ let m; try{ m=JSON.parse(ev.data); }catch(e){ return; } handle(m); };
   }
   function scheduleReconnect(){
     if (reconnectTimer) return;
@@ -716,7 +716,7 @@ self.onmessage = function(ev){
       const files=this.projects[this.cur].files; let pending=fileList.length;
       for (const file of fileList){
         const rd=new FileReader();
-        const isBin = /\.(wasm|bin|png|jpg|jpeg|gif|wasm)$/i.test(file.name);
+        const isBin = /\.(wasm|bin|png|jpe?g|gif|webp|onnx)$/i.test(file.name);
         rd.onload=()=>{ files[file.name]= isBin ? ("base64:"+btoa(String.fromCharCode.apply(null, new Uint8Array(rd.result)))) : rd.result;
           if(--pending===0){ this.save(); this.renderFiles(); this.open(file.name); log($("labLog"),"uploaded "+fileList.length+" file(s)"); } };
         if (isBin) rd.readAsArrayBuffer(file); else rd.readAsText(file);
@@ -1014,9 +1014,11 @@ self.onmessage = function(ev){
     },
     async onSignalData(data){
       if (data.sdp){ log($("workerLog"),"received host "+(data.sdp.type||"sdp")+" — answering");
-        await this.pc.setRemoteDescription(data.sdp); await this.q.ready();
-        const ans=await this.pc.createAnswer(); await this.pc.setLocalDescription(ans);
-        sig({type:"signal",to:this.hostId,data:{sdp:this.pc.localDescription}}); this.setStatus("negotiating…","warn");
+        try {
+          await this.pc.setRemoteDescription(data.sdp); await this.q.ready();
+          const ans=await this.pc.createAnswer(); await this.pc.setLocalDescription(ans);
+          sig({type:"signal",to:this.hostId,data:{sdp:this.pc.localDescription}}); this.setStatus("negotiating…","warn");
+        } catch(e){ log($("workerLog"),"handshake error: "+((e&&e.message)||e)+" — will retry on next host offer"); this.setStatus("handshake failed — retrying","bad"); }
       } else if (data.candidate){ await this.q.add(data.candidate); }
     },
     onTask(raw){
@@ -1075,6 +1077,7 @@ self.onmessage = function(ev){
   let _ortP=null;
   function loadORT(){ if(!_ortP){ _ortP=new Promise((res,rej)=>{ const sc=document.createElement("script");
     sc.src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.js";
+    sc.integrity="sha384-XM2cMlQFAUJFJ3s2424PSr/v9zkRT4aXfi1cUz2SunZatAOwTR5GfTcIKLJIf3Ns"; sc.crossOrigin="anonymous";
     sc.onload=()=>{ try{ ort.env.wasm.numThreads=1; ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/"; }catch(e){} res(window.ort); };
     sc.onerror=()=>rej(new Error("onnxruntime-web load failed")); document.head.appendChild(sc); }); } return _ortP; }
 

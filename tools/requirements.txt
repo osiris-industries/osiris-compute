@@ -1,12 +1,17 @@
-# Build/partition toolchain deps (Python 3.10+). torch CPU wheel is fine:
-#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Build/partition toolchain deps. Linux/macOS (uses the Unix `resource` module;
+# the lean builder degrades gracefully on Windows). Python 3.10+.
+# Install torch from the CPU wheel index first, then the rest:
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
 #   pip install -r requirements.txt
-torch
-transformers
-tokenizers
-onnx
-onnxruntime
-onnxscript
-safetensors
-huggingface_hub
-numpy
+#
+# Pinned to the set this toolchain is validated against (2026-06). transformers in
+# particular is pinned because osiris_build_sharded.py uses an internal module path
+# (transformers.models.qwen2.modeling_qwen2) that can move between releases.
+torch==2.12.1
+transformers==5.12.1
+tokenizers==0.22.2
+onnx==1.20.0
+onnxruntime==1.23.2
+safetensors==0.8.0
+huggingface_hub==1.19.0
+numpy==2.4.0
