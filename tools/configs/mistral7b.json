@@ -1,7 +1,7 @@
 {
   "id": "mistral7b",
   "name": "Mistral-7B-Instruct-v0.3 \u2014 distributed",
-  "hf_repo": "self-export (optimum), not from hub",
+  "hf_repo": "",
   "onnx_file": "onnx/model_q4.onnx",
   "num_layers": 32,
   "num_kv_heads": 8,
@@ -22,5 +22,6 @@
   "ep": [
     "webgpu"
   ],
-  "source_repo": "mistralai/Mistral-7B-Instruct-v0.3"
+  "source_repo": "mistralai/Mistral-7B-Instruct-v0.3",
+  "note": "self-export via tools/export_box.sh; partition with --skip-download (no hub ONNX)"
 }

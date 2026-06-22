@@ -19,8 +19,14 @@ before going public.
 
 ## Design notes (the threat model in brief)
 
-- **Compute runs in a WASM + WebGPU sandbox** in the browser, isolated from the host
-  filesystem, local network, and other origins by the browser's own boundaries.
+- **LLM inference is data-only**: model shards run through onnxruntime-web (WebGPU/WASM);
+  no peer-supplied code executes for the inference path.
+- **The general-compute feature runs peer-supplied code** (JS in a Web Worker, or WASM/WGSL).
+  The Worker has no filesystem or page/DOM access, but it **can make network requests** — so it
+  is NOT a full capability sandbox. A peer's module only runs **after the receiving user
+  explicitly approves it** (consent prompt, default deny). Treat a circle as "compute among
+  people you trust," not "run anonymous strangers' code safely."
+- Browser-origin boundaries (no host filesystem access, same-origin policy) still apply to all paths.
 - **The coordination server only does WebRTC signaling** (SDP/ICE exchange) and roster
   discovery, then steps out of the data path. It is not in the peer-to-peer data flow
   and does not see computation payloads.

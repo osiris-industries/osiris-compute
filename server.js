@@ -82,13 +82,19 @@ function handler(req, res) {
     return res.end(JSON.stringify({ iceServers: iceServers(), turn: !!(TURN_SECRET && TURN_HOST) }));
   }
   if (urlPath === '/stats') {
-    const out = { now: new Date().toISOString(), connections: wss.clients.size, roomCount: rooms.size, rooms: [] };
-    for (const [code, room] of rooms) {
-      out.rooms.push({
-        code, host: sid(room.host && room.host.peerId), peerCount: room.peers.size,
-        peers: [...room.peers.keys()].map(sid), ageSec: Math.round((Date.now() - room.created) / 1000),
-        lastReport: room.lastReport || null,
-      });
+    // aggregate counts only by default; room codes + device specs require STATS_TOKEN
+    const STATS_TOKEN = process.env.STATS_TOKEN || '';
+    const authed = STATS_TOKEN && req.headers['authorization'] === ('Bearer ' + STATS_TOKEN);
+    const out = { now: new Date().toISOString(), connections: wss.clients.size, roomCount: rooms.size };
+    if (authed) {
+      out.rooms = [];
+      for (const [code, room] of rooms) {
+        out.rooms.push({
+          code, host: sid(room.host && room.host.peerId), peerCount: room.peers.size,
+          peers: [...room.peers.keys()].map(sid), ageSec: Math.round((Date.now() - room.created) / 1000),
+          lastReport: room.lastReport || null,
+        });
+      }
     }
     res.writeHead(200, { 'content-type': 'application/json' });
     return res.end(JSON.stringify(out, null, 2));
@@ -99,7 +105,9 @@ function handler(req, res) {
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('forbidden'); }
   fs.stat(filePath, (err, st) => {
     if (err || !st.isFile()) {
-      // SPA fallback: unknown path -> index.html
+      // real 404 for asset requests (e.g. a missing .onnx); SPA fallback only for navigations
+      const ext = path.extname(rel);
+      if (ext && ext !== '.html') { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('not found'); }
       return fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (e2, shell) => {
         if (e2) { res.writeHead(404); return res.end('not found'); }
         res.writeHead(200, { 'content-type': TYPES['.html'] }); res.end(shell);

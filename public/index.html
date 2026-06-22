@@ -176,7 +176,7 @@
         <div class="row" style="margin-bottom:4px">
           <div>
             <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Models — run a model too big for one device</h2>
-            <p class="muted">Split a model&#39;s <em>layers</em> across the circle (pipeline parallelism). The heavy embedding &amp; head run on capable devices; phones hold interior layers. Each token, only a few KB of <code>hidden_states</code> travel device&#8594;device. Placement is capability-aware. <span class="muted">Demo: distilgpt2 sharded across this device + one peer.</span></p>
+            <p class="muted">Split a model&#39;s <em>layers</em> across the circle (pipeline parallelism). The heavy embedding &amp; head run on capable devices; phones hold interior layers. Each token, only a few KB of <code>hidden_states</code> travel device&#8594;device. Placement is capability-aware.</p>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <select id="mModel" style="background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:9px;font:inherit;font-size:13px">
@@ -186,7 +186,6 @@
               <option value="qwen3b">Qwen2.5-Coder-3B-Instruct</option>
               <option value="mistral7b">Mistral-7B-Instruct-v0.3 — distributed</option>
               <option value="qwen15dist">Qwen2.5-1.5B — distributed-built, 6-shard chain (up to 6 phones)</option>
-              <option value="distilgpt2">distilgpt2 — 82M, fast (completes text)</option>
             </select>
             <button class="btn" id="shardBtn">Set up the model pipeline</button>
           </div>
@@ -1015,6 +1014,11 @@ self.onmessage = function(ev){
         const cv=$("wCanvas"); if(cv && m.img){ const im=new Image(); im.onload=()=>{ const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height); try{ x.drawImage(im,0,0,cv.width,cv.height); }catch(e){} }; im.src=m.img; }
         if (m.out!=null && $("wOut")) $("wOut").textContent=m.out; return; }
       if (m.cmd==="load-module"){
+        if (this._codeOk === undefined) {
+          this._codeOk = window.confirm("This circle wants to run a custom compute module (peer-supplied code) on your device. This is separate from the LLM demo. Only allow if you trust whoever runs this circle. Allow?");
+          log($("workerLog"), this._codeOk ? "custom compute modules: ALLOWED for this circle" : "custom compute modules: BLOCKED for this circle");
+        }
+        if (!this._codeOk) { try{ this.channel.send(JSON.stringify({cmd:"module-denied", moduleId:m.moduleId})); }catch(e){} return; }
         if (m.lang==="wgsl"){
           loadWGSLModule(m.moduleId, m.src).then(()=>{ try{ this.channel.send(JSON.stringify({cmd:"module-ready", moduleId:m.moduleId})); }catch(e){} log($("workerLog"),"compiled WGSL "+m.moduleId+" for local GPU"); })
             .catch(e=>{ log($("workerLog"),"WGSL compile skipped (no GPU?): "+e.message); });
@@ -1107,11 +1111,6 @@ self.onmessage = function(ev){
         {file:"qMID5.onnx", kv:[22,26], seamIn:"hidden_at_22", seamOut:"hidden_at_26"}
       ],
       chat:true, stop:151645, chatTemplate:null, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"], memPattern:false },
-    distilgpt2: { id:"distilgpt2", name:"distilgpt2 (82M)", base:"/models/",
-      files:{front:"stage_FRONT.onnx", mid:"stage_MID.onnx", back:"stage_BACK.onnx", tok:"tokenizer.json"},
-      seamF:"/transformer/h.1/Add_1_output_0", seamM:"/transformer/h.3/Add_1_output_0",
-      kvFront:[0,2], kvMid:[2,4], kvBack:[4,6], kvHeads:12, headDim:64,
-      chat:false, stop:null, defaultPrompt:"The future of distributed computing is", defTemp:0.8, ep:["webgpu"] }
   };
 
   function tokFactory(tj){

@@ -32,7 +32,7 @@ It is deliberately a **free public utility, not a product.** Fork it, host it, f
 1. **Open a circle.** One device hosts and gets a single share link.
 2. **Peers join from the browser.** No install — just the link.
 3. **The coordination server only introduces, then withdraws.** It performs WebRTC signaling (SDP/ICE exchange) and roster/capability discovery, then steps out of the data path.
-4. **Work flows directly peer-to-peer** over WebRTC data channels. Tasks execute inside a **WebAssembly + WebGPU sandbox**, isolated from files, photos, passwords, and the local network.
+4. **Work flows directly peer-to-peer** over WebRTC data channels. **LLM inference runs as data** through onnxruntime-web (WebGPU/WASM) — no peer code executes on your device. The separate **general-compute** feature runs peer-supplied code in a Web Worker (no file or page/DOM access, but it *can* use the network) and **only after you explicitly approve it**. Treat a circle as compute among people you trust.
 5. **Participation is conscious.** Computation runs only while the tab is open and visible — no hidden background work, no surprise battery drain.
 
 The server never sees your data, because after the introduction it isn't in the conversation.
@@ -183,7 +183,7 @@ STUN uses public `stun.l.google.com:19302` out of the box. TURN is **optional** 
 
 ```
 server.js            signaling router (WebRTC SDP/ICE relay, roster, ICE-config endpoint) + static host
-public/index.html    the client — WebRTC mesh, WASM/WebGPU sandbox, model registry, shard chaining
+public/index.html    the client — WebRTC mesh, ort-web inference, model registry, shard chaining
 public/wabt.js       vendored WebAssembly Binary Toolkit (Apache-2.0; see NOTICE)
 fetch-demo-model.sh  pull a small demo model's shards from the public grid into public/models/
 tools/               model partitioning toolchain (HF model → browser-ready FRONT/interior/BACK shards)
