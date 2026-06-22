@@ -179,6 +179,30 @@ not stored in git). There are three ways to actually run a model:
 
 STUN uses public `stun.l.google.com:19302` out of the box. TURN is **optional** — only needed so peers on hostile NATs can still connect; supply your own relay. No secrets are committed to this repo.
 
+
+---
+
+## Deploy
+
+**Docker** (one small image; model shards are fetched separately, not baked in):
+
+```bash
+docker build -t osiris-compute .
+docker run --rm -p 8080:8080 osiris-compute
+# then open http://localhost:8080 in two browser tabs to form a circle
+```
+
+**DigitalOcean App Platform:** point a new App at this repo, pick the **Dockerfile**
+build type, and set `HOST=0.0.0.0` (App Platform supplies `PORT`). The container serves
+the signaling WebSocket and the static client on one port; App Platform terminates TLS,
+so `wss://` works without mounting certs. Model shards aren't in the image — fetch them
+into `public/models/` at deploy time with `./fetch-demo-model.sh`, or host them on
+**DO Spaces** and point each model's `base:` at that URL. TURN is optional (see Configuration).
+
+> **AGPL note for operators:** Osiris Compute is AGPL-3.0-or-later. If you run a *modified*
+> version as a network service, the license asks you to offer your changes to its users.
+> Running it unmodified carries no such obligation.
+
 ---
 
 ## Repository layout
