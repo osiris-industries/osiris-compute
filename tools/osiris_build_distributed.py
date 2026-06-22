@@ -43,8 +43,9 @@ def parse_ssh(host):
     spec = host[len("ssh:"):]
     conn, rdir = spec.split(":", 1)
     key = os.environ.get("OSIRIS_SSH_KEY")
-    base = ["ssh"] + (["-i", key] if key else []) + SSH_OPTS + [conn]
-    scp = ["scp"] + (["-i", key] if key else []) + SSH_OPTS
+    # "--" stops ssh/scp option parsing so a hostile host token (e.g. -oProxyCommand=) can't inject flags
+    base = ["ssh"] + (["-i", key] if key else []) + SSH_OPTS + ["--", conn]
+    scp = ["scp"] + (["-i", key] if key else []) + SSH_OPTS + ["--"]
     return conn, rdir, base, scp
 
 
@@ -188,7 +189,8 @@ def run_build(args):
             txt = verify_chain(args.workdir, os.path.join(args.workdir, "_vc"), dims, args.prompt)
             print("Q:", args.prompt); print("A:", txt)
         except Exception as e:
-            print("verify skipped/failed:", e)
+            print("\n=== DISTRIBUTED BUILD FAILED: shard-chain verification errored:", e, "===", flush=True)
+            sys.exit(1)
     print("\n=== DISTRIBUTED BUILD DONE ===")
 
 

@@ -19,7 +19,7 @@ pip install -q optimum optimum-onnx onnx onnxruntime onnx_ir "transformers" toke
   || { echo "PIP FAIL"; echo "=== BOX FAIL ==="; exit 1; }
 python3 -c "import optimum.exporters.onnx; print('exporters import OK')" || { echo "EXPORTERS IMPORT FAIL"; echo "=== BOX FAIL ==="; exit 1; }
 export HF_HUB_ENABLE_HF_TRANSFER=0
-mkdir -p /root/work/$ID/onnx
+mkdir -p /root/work/"$ID"/onnx
 echo "[$(date -u +%T)] === EXPORT $REPO (fp32 onnx, with-past) via main_export ==="
 python3 - "$REPO" "$ID" <<'PY' || { echo "EXPORT FAIL"; echo "=== BOX FAIL ==="; exit 1; }
 import sys
@@ -28,7 +28,7 @@ repo, ID = sys.argv[1], sys.argv[2]
 main_export(repo, output=f"/root/work/{ID}/onnx_fp32/", task="text-generation-with-past", opset=14, no_post_process=True)
 print("export done")
 PY
-cp /root/work/$ID/onnx_fp32/tokenizer.json /root/work/$ID/tokenizer.json 2>/dev/null || true
+cp /root/work/"$ID"/onnx_fp32/tokenizer.json /root/work/"$ID"/tokenizer.json 2>/dev/null || true
 echo "[$(date -u +%T)] === QUANT int4 (weights only, fp32 activations) ==="
 python3 - "$ID" <<'PY' || { echo "QUANT FAIL"; echo "=== BOX FAIL ==="; exit 1; }
 import sys, onnx
@@ -41,8 +41,8 @@ q.model.save_model_to_file(f"/root/work/{ID}/onnx/model_q4.onnx", use_external_d
 print("quant done")
 PY
 echo "[$(date -u +%T)] === SLICE (osiris_partition.py) ==="
-cd /root/work && python3 /root/osiris_partition.py --config /root/$ID.json --workdir /root/work/$ID --skip-download \
+cd /root/work && python3 /root/osiris_partition.py --config /root/"$ID".json --workdir /root/work/"$ID" --skip-download \
   || { echo "SLICE FAIL"; echo "=== BOX FAIL ==="; exit 1; }
 echo "[$(date -u +%T)] === shard sizes ==="
-ls -la /root/work/$ID/qFRONT.onnx /root/work/$ID/qMID*.onnx /root/work/$ID/qBACK.onnx 2>/dev/null
+ls -la /root/work/"$ID"/qFRONT.onnx /root/work/"$ID"/qMID*.onnx /root/work/"$ID"/qBACK.onnx 2>/dev/null
 echo "=== BOX DONE ==="
