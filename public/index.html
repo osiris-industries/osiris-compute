@@ -211,7 +211,7 @@
         <div class="row" style="margin-bottom:4px">
           <div>
             <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Code lab — write code to run in your circle</h2>
-            <p class="muted">A private in-browser workspace. Every project is editable code: a <code>.wgsl</code> compute shader runs on the circle’s GPUs; <code>.js</code> / <code>.wat</code> / <code>.wasm</code> kernels run across the CPU cores. Build &amp; run farms it across every linked device. <span id="labLang" style="font-family:var(--mono)"></span></p>
+            <p class="muted">A private in-browser workspace. Every project is editable code: a <code>.wgsl</code> compute shader runs on the circle’s GPUs; <code>.js</code> / <code>.wat</code> / <code>.wasm</code> kernels run across the CPU cores. Build &amp; run farms it across every linked device. <strong>New to the output format?</strong> Base any visuals on the example projects (Mandelbrot / SIMP / Distributed art): a kernel returns a small typed result &mdash; <code>return {kind:&quot;tile&quot;, x,y,w,h,rgba}</code> for an image band, a plain number, a string, or <code>{kind:&quot;points&quot;|&quot;json&quot;}</code>. Use <code>kind</code> (not <code>type</code>) and a flat <code>rgba</code> byte array. <span id="labLang" style="font-family:var(--mono)"></span></p>
           </div>
           <div class="taskpick" id="projPick"></div>
         </div>
