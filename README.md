@@ -52,7 +52,7 @@ The live grid serves several models this way. The stable multi-device demo is **
 
 ---
 
-## Run it on a LAN — the fast path ⚡
+## Run it on a LAN — the fast path 
 
 If everyone is **on the same network** (a house, an office, a dorm, one router), Osiris Compute gets dramatically faster — close to how distributed inference behaves inside a data center. Here's the physics, because it's the whole point:
 
@@ -107,7 +107,7 @@ Pre-fetching the shards onto the host means peers pull them over the local netwo
 
 ---
 
-## For reviewers (DigitalOcean Open Source team 👋)
+## For reviewers (DigitalOcean Open Source team)
 
 The fastest way to see it work — **no clone, no install:**
 
