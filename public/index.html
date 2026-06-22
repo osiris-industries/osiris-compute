@@ -202,6 +202,7 @@
             <label style="color:var(--ink-soft);font-size:13px">max new tokens <input id="mMax" type="number" value="40" min="1" max="1024" style="width:64px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
             <label style="color:var(--ink-soft);font-size:13px;margin-left:10px">temp <input id="mTemp" type="number" value="0.8" min="0" max="1.5" step="0.1" style="width:56px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:6px;padding:6px;font:inherit"></label>
             <button class="btn" id="genBtn" disabled>Generate</button>
+            <button class="btn" id="stopBtn" disabled>Stop</button>
           </div>
         </div>
         <div id="modelOut" style="font-family:var(--mono);font-size:15px;white-space:pre-wrap;min-height:2em;margin-top:10px;color:var(--ink)"></div>
@@ -873,6 +874,8 @@ self.onmessage = function(ev){
       } else if (m.cmd==="module-ready"){
         if (peer){ peer.moduleReady=peer.moduleReady||new Set(); peer.moduleReady.add(m.moduleId); }
         log($("hostLog"),"peer "+peerId.slice(0,6)+" ready: module "+m.moduleId); this.pump();
+      } else if (m.cmd==="module-denied"){
+        log($("hostLog"),"peer "+peerId.slice(0,6)+" declined custom module "+m.moduleId+" (consent not granted)");
       } else if (m.cmd==="shard-ready"){ models.onShardReady();
       } else if (m.cmd==="shard-out"){ models.onShardOut(m);
       }
@@ -1287,12 +1290,13 @@ self.onmessage = function(ev){
       let ids=buildPrompt(M,this.tok,text); if(!ids.length){ this.mlog("couldn't tokenize."); return; }
       const maxNew=Math.max(1,Math.min(1024,parseInt(($("mMax")&&$("mMax").value)||"40",10)||40));
       this.temp=Math.max(0,parseFloat(($("mTemp")&&$("mTemp").value)||String(M.defTemp)));
-      this.busy=true; if($("genBtn"))$("genBtn").disabled=true; $("mTps").textContent="…";
+      this._abort=false; this.busy=true; if($("genBtn"))$("genBtn").disabled=true; if($("stopBtn"))$("stopBtn").disabled=false; $("mTps").textContent="…";
       const tokens=[...ids], gen=[]; let last=null;
       const kvF=this.kvRange(M,M.kvFront), kvB=this.kvRange(M,M.kvBack); const tD=[];
       const head=(M.chat? "":text); $("modelOut").textContent=head+" "; this.mlog("query: "+ids.length+" tokens, up to "+maxNew+"…");
       try{
         for(let step=0;;step++){
+          if(this._abort){ this.mlog("⏹ stopped after "+gen.length+" generated token(s)."); break; }
           const t=tokens[step], seqlen=step+1, t0=performance.now();
           const pool={ input_ids:this.i64([t],[1,1]), attention_mask:this.i64(new Array(seqlen).fill(1),[1,seqlen]), position_ids:this.i64([step],[1,1]) };
           const of=await this.sessF.run(Object.assign({},this.feed(this.sessF,pool),kvF));
@@ -1314,7 +1318,7 @@ self.onmessage = function(ev){
         const avg=tD.reduce((a,b)=>a+b,0)/(tD.length||1); $("mTps").textContent=(1000/avg).toFixed(1)+" tok/s";
         this.mlog("✓ answered across "+(this._needPeers+1)+" devices / "+this.stages.length+" interior stage(s) ("+gen.length+" tokens) on "+M.id+" — the model never lived on one.");
       }catch(e){ this.mlog("generation error: "+(e&&e.message||e)); }
-      this.busy=false; if($("genBtn"))$("genBtn").disabled=false;
+      this.busy=false; if($("genBtn"))$("genBtn").disabled=false; if($("stopBtn"))$("stopBtn").disabled=true;
     },
     async onReset(){
       try{ for(const k in (this.sessByStage||{})){ const s=this.sessByStage[k]; if(s&&s.release) await s.release(); } }catch(e){}
@@ -1400,6 +1404,7 @@ self.onmessage = function(ev){
   }
   if ($("shardBtn")) $("shardBtn").onclick=()=>models.setup();
   if ($("genBtn")) $("genBtn").onclick=()=>models.generate();
+  if ($("stopBtn")) $("stopBtn").onclick=()=>{ models._abort=true; $("stopBtn").disabled=true; };
   $("copyBtn").onclick=()=>{ $("shareLink").select(); navigator.clipboard.writeText($("shareLink").value); $("copyBtn").textContent="Copied"; setTimeout(()=>$("copyBtn").textContent="Copy link",1500); };
   document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible" && wakeLock===null) requestWakeLock(); });
 
