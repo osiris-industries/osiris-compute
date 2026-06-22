@@ -347,12 +347,12 @@ function kUser(chunk){
 self.onmessage = function(ev){
   var d=ev.data, bytes;
   if (d.kind==="load-module"){
-    var ok=false;
+    var ok=false, loadErr=null;
     try {
-      if (d.lang==="js"){ var mod=new Function(d.src+"\n;return { run:(typeof run!==\"undefined\"?run:null), config:(typeof OSIRIS!==\"undefined\"?OSIRIS:(typeof config===\"function\"?config():null)) };")(); if (mod && typeof mod.run==="function"){ userMods[d.moduleId]={run:mod.run, lang:"js", config:mod.config||null}; ok=true; } }
+      if (d.lang==="js"){ var jsrc=String(d.src).replace(/\bexport\s+default\s+/g,"").replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)/g,""); var mod=new Function(jsrc+"\n;return { run:(typeof run!==\"undefined\"?run:null), config:(typeof OSIRIS!==\"undefined\"?OSIRIS:(typeof config===\"function\"?config():null)) };")(); if (mod && typeof mod.run==="function"){ userMods[d.moduleId]={run:mod.run, lang:"js", config:mod.config||null}; ok=true; } }
       else { var bin=atob(d.b64), u=new Uint8Array(bin.length); for (var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); var exp=new WebAssembly.Instance(new WebAssembly.Module(u), {}).exports; var cfg=null; try{ if(exp.osiris_n||exp.osiris_parts){ cfg={}; if(exp.osiris_n)cfg.n=exp.osiris_n()|0; if(exp.osiris_parts)cfg.parts=exp.osiris_parts()|0; } }catch(e){} userMods[d.moduleId]={run:exp.run, lang:"wasm", exports:exp, config:cfg}; ok=true; }
-    } catch(e){ userMods[d.moduleId]=null; }
-    self.postMessage({kind:"loaded", moduleId:d.moduleId, ok:ok, config:(userMods[d.moduleId]&&userMods[d.moduleId].config)||null}); return;
+    } catch(e){ userMods[d.moduleId]=null; loadErr=String((e&&e.message)||e); }
+    self.postMessage({kind:"loaded", moduleId:d.moduleId, ok:ok, error:loadErr, config:(userMods[d.moduleId]&&userMods[d.moduleId].config)||null}); return;
   }
   if (d.task==="userwasm") bytes = kUser(d.chunk);
   else bytes = new Uint8Array(0);
@@ -421,7 +421,7 @@ self.onmessage = function(ev){
   function poolLoadModule(moduleId, lang, payload){
     const P=pool();
     const msg = (lang==="js") ? {kind:"load-module", moduleId, lang:"js", src:payload} : {kind:"load-module", moduleId, lang:"wasm", b64:abToB64(payload)};
-    return Promise.all(P.workers.map(w=> new Promise(res=>{ w._loadcb=w._loadcb||{}; w._loadcb[moduleId]=res; w.postMessage(msg); }))).then(rs=>{ for (const r of rs){ if (r && r.config) return r.config; } return null; });
+    return Promise.all(P.workers.map(w=> new Promise(res=>{ w._loadcb=w._loadcb||{}; w._loadcb[moduleId]=res; w.postMessage(msg); }))).then(rs=>{ const bad=rs.find(r=>r&&r.ok===false); if (bad&&bad.error){ try{ log($("workerLog"),"⚠ module failed to load: "+bad.error); }catch(e){} } for (const r of rs){ if (r && r.config) return r.config; } return null; });
   }
   // WAT -> wasm in-browser via self-hosted wabt.js
   let _wabtP=null;
@@ -532,7 +532,7 @@ self.onmessage = function(ev){
         return out; },
       integrate(cid, chunk, bytes){
         let res;
-        if (host.moduleLang === "js"){ try { res = JSON.parse(new TextDecoder().decode(bytes)); } catch(e){ res = {kind:"log", text:"(unparseable result)"}; } }
+        if (host.moduleLang === "js"){ try { if(!bytes||!bytes.length) throw 0; res = JSON.parse(new TextDecoder().decode(bytes)); } catch(e){ res = {kind:"log", text:"(no result — kernel failed to load? check the log)"}; } }
         else { res = {kind:"number", value:new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getInt32(0,true)}; }
         renderResult(res, chunk);
       }
