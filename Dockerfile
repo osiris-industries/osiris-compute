@@ -1,7 +1,7 @@
 # Osiris Compute — signaling router + static client in one small Node process.
 # Model shards are NOT baked into the image (they're large and optional); fetch
 # them at deploy time with ./fetch-demo-model.sh or serve them from object storage.
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
