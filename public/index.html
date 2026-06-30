@@ -94,6 +94,21 @@
   footer{max-width:880px;margin:0 auto;padding:40px 24px;color:var(--mute);font-size:12px;border-top:1px solid var(--rule)}
   footer a{color:var(--ink-soft)}
 </style>
+<style id="osiris-responsive-fix">
+/* Never allow sideways scroll on small screens */
+html, body { max-width: 100%; overflow-x: hidden; }
+/* Long form controls must shrink to fit, not push off-screen */
+select, input, textarea { max-width: 100%; box-sizing: border-box; }
+@media (max-width: 640px) {
+  /* Model picker: was overflowing the right edge on phones */
+  #mModel { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+  /* Stack the picker + its button full width under the heading */
+  #modelStage .row > div:last-child { width: 100%; }
+  #shardBtn { width: 100%; }
+  /* Keep the section paddings from forcing overflow */
+  .wrap { padding-left: 16px; padding-right: 16px; }
+}
+</style>
 </head>
 <body>
   <div class="topbar">
