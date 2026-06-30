@@ -147,7 +147,7 @@ def emit_registry(cfg, n_layers, F, M, K, cuts, seam_into):
     if K == 1:
         seamF, seamM = seam_into(F), seam_into(M)
         entry = (
-f'''    {cfg["id"]}: {{ id:"{cfg["id"]}", name:"{cfg["name"]}", base:"/models/{cfg["id"]}/",
+f'''    "{cfg["id"]}": {{ id:"{cfg["id"]}", name:"{cfg["name"]}", base:"/models/{cfg["id"]}/",
       files:{{front:"qFRONT.onnx", mid:"qMID.onnx", back:"qBACK.onnx", tok:"tokenizer.json"}},
       seamF:"{seamF}", seamM:"{seamM}",
       kvFront:[0,{F}], kvMid:[{F},{M}], kvBack:[{M},{n_layers}], kvHeads:{cfg["num_kv_heads"]}, headDim:{cfg["head_dim"]},
@@ -160,7 +160,7 @@ f'''    {cfg["id"]}: {{ id:"{cfg["id"]}", name:"{cfg["name"]}", base:"/models/{c
                           f'seamIn:"{seam_into(lo)}", seamOut:"{seam_into(hi)}"}}')
         mids = ",\n".join(stages)
         entry = (
-f'''    {cfg["id"]}: {{ id:"{cfg["id"]}", name:"{cfg["name"]}", base:"/models/{cfg["id"]}/",
+f'''    "{cfg["id"]}": {{ id:"{cfg["id"]}", name:"{cfg["name"]}", base:"/models/{cfg["id"]}/",
       files:{{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"}},
       seamF:"{seam_into(F)}", seamM:"{seam_into(M)}",
       kvFront:[0,{F}], kvBack:[{M},{n_layers}], kvHeads:{cfg["num_kv_heads"]}, headDim:{cfg["head_dim"]},

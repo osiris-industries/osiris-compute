@@ -201,6 +201,8 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
               <option value="qwen3b">Qwen2.5-Coder-3B-Instruct</option>
               <!-- Mistral-7B hidden from the picker until logit-equivalence is validated (Qwen RoPE/EOS assumed) -->
               <option value="qwen15dist">Qwen2.5-1.5B — distributed-built, 6-shard chain (up to 6 phones)</option>
+              <option value="qwen3-4b-7shard">Qwen3-4B — 6-stage chain (verified)</option>
+              <option value="qwen3-32b">Qwen3-32B — 22-stage chain (~7-10 laptops/desktops)</option>
             </select>
             <button class="btn" id="shardBtn">Set up the model pipeline</button>
           </div>
@@ -1140,6 +1142,50 @@ self.onmessage = function(ev){
 
   // model registry — adding a model is a config entry (+ its shard files under base)
   const MODELS = {
+    "qwen3-4b-7shard": { id:"qwen3-4b-7shard", name:"qwen3-4b-7shard", base:"/models/qwen3-4b-7shard/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"hidden_at_4", seamM:"hidden_at_34",
+      kvFront:[0,4], kvBack:[34,36], kvHeads:8, headDim:128,
+      midStages:[
+        {file:"qMID0.onnx", kv:[4,11], seamIn:"hidden_at_4", seamOut:"hidden_at_11"},
+        {file:"qMID1.onnx", kv:[11,19], seamIn:"hidden_at_11", seamOut:"hidden_at_19"},
+        {file:"qMID2.onnx", kv:[19,26], seamIn:"hidden_at_19", seamOut:"hidden_at_26"},
+        {file:"qMID3.onnx", kv:[26,34], seamIn:"hidden_at_26", seamOut:"hidden_at_34"}
+      ],
+      chat:true, stop:151645, chatTemplate:null,
+      defaultPrompt:"What is the capital of France?", defTemp:0.5,
+      ep:["webgpu"], memPattern:false },
+
+    "qwen3-32b": { id:"qwen3-32b", name:"qwen3-32b", base:"/models/qwen3-32b/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"hidden_at_1", seamM:"hidden_at_62",
+      kvFront:[0,1], kvBack:[62,64], kvHeads:8, headDim:128,
+      midStages:[
+        {file:"qMID0.onnx", kv:[1,4], seamIn:"hidden_at_1", seamOut:"hidden_at_4"},
+        {file:"qMID1.onnx", kv:[4,7], seamIn:"hidden_at_4", seamOut:"hidden_at_7"},
+        {file:"qMID2.onnx", kv:[7,10], seamIn:"hidden_at_7", seamOut:"hidden_at_10"},
+        {file:"qMID3.onnx", kv:[10,13], seamIn:"hidden_at_10", seamOut:"hidden_at_13"},
+        {file:"qMID4.onnx", kv:[13,16], seamIn:"hidden_at_13", seamOut:"hidden_at_16"},
+        {file:"qMID5.onnx", kv:[16,19], seamIn:"hidden_at_16", seamOut:"hidden_at_19"},
+        {file:"qMID6.onnx", kv:[19,22], seamIn:"hidden_at_19", seamOut:"hidden_at_22"},
+        {file:"qMID7.onnx", kv:[22,25], seamIn:"hidden_at_22", seamOut:"hidden_at_25"},
+        {file:"qMID8.onnx", kv:[25,28], seamIn:"hidden_at_25", seamOut:"hidden_at_28"},
+        {file:"qMID9.onnx", kv:[28,31], seamIn:"hidden_at_28", seamOut:"hidden_at_31"},
+        {file:"qMID10.onnx", kv:[31,34], seamIn:"hidden_at_31", seamOut:"hidden_at_34"},
+        {file:"qMID11.onnx", kv:[34,37], seamIn:"hidden_at_34", seamOut:"hidden_at_37"},
+        {file:"qMID12.onnx", kv:[37,40], seamIn:"hidden_at_37", seamOut:"hidden_at_40"},
+        {file:"qMID13.onnx", kv:[40,43], seamIn:"hidden_at_40", seamOut:"hidden_at_43"},
+        {file:"qMID14.onnx", kv:[43,46], seamIn:"hidden_at_43", seamOut:"hidden_at_46"},
+        {file:"qMID15.onnx", kv:[46,49], seamIn:"hidden_at_46", seamOut:"hidden_at_49"},
+        {file:"qMID16.onnx", kv:[49,52], seamIn:"hidden_at_49", seamOut:"hidden_at_52"},
+        {file:"qMID17.onnx", kv:[52,55], seamIn:"hidden_at_52", seamOut:"hidden_at_55"},
+        {file:"qMID18.onnx", kv:[55,58], seamIn:"hidden_at_55", seamOut:"hidden_at_58"},
+        {file:"qMID19.onnx", kv:[58,62], seamIn:"hidden_at_58", seamOut:"hidden_at_62"}
+      ],
+      chat:true, stop:151645, chatTemplate:null,
+      defaultPrompt:"What is the capital of France?", defTemp:0.5,
+      ep:["webgpu"], memPattern:false },
+
     mistral7b: { id:"mistral7b", name:"Mistral-7B-Instruct-v0.3 — distributed", base:"/models/mistral7b/",
       files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
       seamF:"/model/layers.4/Add_1_output_0", seamM:"/model/layers.26/Add_1_output_0",
