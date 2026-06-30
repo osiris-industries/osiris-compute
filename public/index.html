@@ -241,6 +241,37 @@
           <span id="labResult" style="font-family:var(--mono);font-size:13px;color:var(--ink-soft)"></span>
         </div>
         <p class="muted" style="margin-top:8px">CPU kernels export <code>run(lo, hi, chunk)</code> and return a typed result (number, log, tile, image, points). Declare work size in the script — JS: <code>const OSIRIS = {n, parts, label}</code>; WAT/WASM: export <code>osiris_n</code> / <code>osiris_parts</code>. GPU kernels are <code>.wgsl</code> compute shaders: a <code>//!osiris {…}</code> header declares <code>parts</code>/<code>W</code>/<code>H</code>/<code>maxIter</code>/<code>p[]</code>, and each writes one packed-RGBA <code>u32</code> per pixel.</p>
+        <details class="aigen" style="margin-top:14px;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;background:var(--paper)">
+          <summary style="cursor:pointer;font-family:var(--mono);font-size:13px;color:var(--ink)">Generate a kernel with an AI &rarr;</summary>
+          <div style="margin-top:10px">
+            <p class="muted">You do not have to write the solver. Open an example project, hand it to any AI with the rules below, tell it what to optimize, and paste the result back into a new file. If it errors, the log prints <code>{kind:&quot;error&quot;}</code> text. Paste that back to the AI and it fixes itself.</p>
+            <p class="muted" style="margin-top:8px"><strong style="color:var(--ink-soft)">Keep:</strong> the <code>const OSIRIS = {parts,label}</code> line, the <code>run(lo,hi,chunk)</code> signature, work picked by <code>chunk.index</code>, the typed return (<code>kind</code> with <code>rgba</code>/<code>caption</code>/<code>sub</code>, or a number/json), and pure sandbox-safe code (no imports, no network, no DOM).<br>
+            <strong style="color:var(--ink-soft)">Change:</strong> the objective, the parameter sweep, the per-point solver, the labels.<br>
+            <strong style="color:var(--ink-soft)">Watch:</strong> <code>OSIRIS.parts</code> must equal the number of candidates (for a sweep, the product of its dimensions), and each <code>run</code> call must stand alone.</p>
+            <div class="row" style="margin:8px 0 6px">
+              <span style="font-family:var(--mono);font-size:11px;color:var(--mute)">Copy this prompt, then paste an example kernel under it</span>
+              <button class="chip" id="copyPromptBtn" type="button">Copy prompt</button>
+            </div>
+            <textarea id="aiPrompt" readonly spellcheck="false" style="width:100%;min-height:170px;background:#0e1217;color:var(--ink-soft);border:1px solid #2a333d;border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;text-transform:none;letter-spacing:0;line-height:1.5">You are writing a kernel for Osiris Compute, a browser based distributed compute grid. It runs in a sandboxed Web Worker: no DOM, no network, no imports, no Node APIs. Inline all math.
+
+Follow this contract exactly:
+1. Declare work size at the top: const OSIRIS = { parts: N, label: "..." }  (N = number of independent work items).
+2. Export one function: function run(lo, hi, chunk) { ... }. It is called once per chunk. Use chunk.index (0 to parts-1) to pick which item this call does. Each call must be fully independent, no shared state.
+3. Return a typed result the host can draw:
+   - a number, or a string (shown as a log line), or
+   - { kind: "tile", w, h, rgba, x, y, caption, sub }  (rgba = flat byte array, 4 values per pixel) to draw a gallery cell, or
+   - { kind: "json", data }  for structured output.
+   Use kind, not type.
+4. OSIRIS.parts must equal the number of items you return one result for. For a parameter sweep, that is the product of the sweep dimensions.
+
+Task: write a kernel that optimizes ____ over parameters ____ by ____.
+Each chunk evaluates ONE candidate chosen by chunk.index and returns a tile with caption = the parameters and sub = the objective value.
+Output only the kernel code, nothing else.
+
+Below this line is a working example to match the style:</textarea>
+          </div>
+        </details>
+        <script>(function(){var b=document.getElementById("copyPromptBtn");if(!b)return;b.addEventListener("click",function(){var t=document.getElementById("aiPrompt");t.focus();t.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}if(navigator.clipboard){navigator.clipboard.writeText(t.value).catch(function(){});}var o=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=o;},1500);});})();</script>
         <div class="log" id="labLog"></div>
       </div>
     </section>
