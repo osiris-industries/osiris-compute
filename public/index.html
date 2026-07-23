@@ -439,8 +439,13 @@ Below this line is a working example to match the style:</textarea>
   </div>
 
   <footer class="wrap">
-    Osiris Compute · a non-commercial public utility by <a href="https://osirisindustries.net/">Osiris Industries</a> · the signaling server never sees your computation.
+    Osiris Compute <span id="verBadge" style="opacity:.55;font-family:monospace;font-size:11px">v0.3.0-dev</span> · a non-commercial public utility by <a href="https://osirisindustries.net/">Osiris Industries</a> · the signaling server never sees your computation.
   </footer>
+  <script>
+    // version badge: shows client build; cross-checks the live server /version, flags a mismatch.
+    (function(){ var C="0.3.0-dev", el=document.getElementById("verBadge"); if(!el) return; el.textContent="v"+C;
+      fetch("/version",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){ if(j&&j.version){ el.title="client v"+C+" \u00b7 server v"+j.version; if(j.version!==C && j.version!=="unknown") el.style.color="#e0a030"; } }).catch(function(){}); })();
+  </script>
 
 <!-- ===================================================================== -->
 <!-- Pure compute kernels. Loaded as text and run inside a Web Worker (no   -->

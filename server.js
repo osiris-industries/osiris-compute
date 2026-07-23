@@ -85,6 +85,12 @@ const TYPES = {
 function handler(req, res) {
   const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
   if (urlPath === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
+  if (urlPath === '/version') {
+    let v = process.env.OSIRIS_VERSION || 'unknown';
+    try { v = require('./package.json').version || v; } catch (e) { /* noop */ }
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify({ name: 'osiris-compute', version: v, node: process.version, uptimeSec: Math.round(process.uptime()) }));
+  }
   if (urlPath === '/ice') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ iceServers: iceServers(), turn: !!(TURN_SECRET && TURN_HOST) }));
