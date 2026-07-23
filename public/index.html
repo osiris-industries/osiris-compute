@@ -452,6 +452,56 @@ Below this line is a working example to match the style:</textarea>
 <!-- DOM, off the main thread). This is the "task module" layer: add a      -->
 <!-- kernel here + a TASKS entry below and the circle can run it.           -->
 <!-- ===================================================================== -->
+<!-- ===== Play-while-you-wait (v0.3): light 2D game, CPU-only ==================== -->
+<!-- Deliberately 2D-canvas / CPU so it NEVER competes with the WebGPU the model    -->
+<!-- uses. GPU is idle during download and ~85% idle per device during inference,   -->
+<!-- so this is free entertainment for the notably-longer wait. Fully additive:     -->
+<!-- a fixed button + overlay, no change to the circle layout.                      -->
+<button id="playFab" title="Play a game while your circle works" style="position:fixed;right:16px;bottom:16px;z-index:60;background:#12212e;color:#e8eef2;border:1px solid #2a4356;border-radius:24px;padding:10px 16px;font:inherit;font-size:14px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4)">&#127918; Play while you wait</button>
+<div id="playPanel" style="display:none;position:fixed;inset:0;z-index:61;background:rgba(6,10,14,.88);align-items:center;justify-content:center">
+  <div style="background:#0d1620;border:1px solid #22384a;border-radius:14px;padding:16px;max-width:min(94vw,460px);text-align:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+      <strong style="font-family:monospace">Packet Run</strong>
+      <span style="opacity:.7;font-size:12px">score <span id="pgScore">0</span> &middot; best <span id="pgBest">0</span></span>
+      <button id="playClose" style="background:none;border:none;color:#9fb3c4;font-size:20px;cursor:pointer">&#10005;</button>
+    </div>
+    <canvas id="pgCanvas" width="420" height="520" style="width:100%;max-width:420px;background:#07101a;border-radius:8px;touch-action:none"></canvas>
+    <p style="opacity:.6;font-size:12px;margin:8px 0 0">Tap / click / space to fly the packet through the circle. Runs on your CPU, not the model's GPU.</p>
+  </div>
+</div>
+<script>
+(function(){
+  var fab=document.getElementById("playFab"), panel=document.getElementById("playPanel"),
+      closeB=document.getElementById("playClose"), cv=document.getElementById("pgCanvas");
+  if(!fab||!cv) return;
+  var ctx=cv.getContext("2d"), W=cv.width, H=cv.height, GAP=120;
+  var best=+(localStorage.getItem("pg_best")||0); document.getElementById("pgBest").textContent=best;
+  var raf=null, y, vy, gates, t, score, dead;
+  function reset(){ y=H/2; vy=0; gates=[]; t=0; score=0; dead=false; document.getElementById("pgScore").textContent=0; }
+  function flap(){ if(dead){ reset(); return; } vy=-5.2; }
+  function step(){
+    t++; vy+=0.28; y+=vy;
+    if(t%80===0) gates.push({x:W, top:70+Math.random()*(H-140-GAP), done:false});
+    ctx.fillStyle="#07101a"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#4fd1c5"; ctx.fillRect(70,y-7,16,14);
+    for(var i=0;i<gates.length;i++){ var p=gates[i]; p.x-=2.4;
+      ctx.fillStyle="#1b3a4b"; ctx.fillRect(p.x,0,26,p.top); ctx.fillRect(p.x,p.top+GAP,26,H-(p.top+GAP));
+      if(!p.done && p.x+26<70){ p.done=true; score++; document.getElementById("pgScore").textContent=score; }
+      if(86>p.x && 70<p.x+26 && (y-7<p.top || y+7>p.top+GAP)) dead=true;
+    }
+    gates=gates.filter(function(p){return p.x>-30;});
+    if(y+7>H||y-7<0) dead=true;
+    if(dead){ ctx.fillStyle="rgba(224,80,60,.95)"; ctx.font="20px monospace"; ctx.textAlign="center"; ctx.fillText("tap to retry",W/2,H/2);
+      if(score>best){ best=score; localStorage.setItem("pg_best",best); document.getElementById("pgBest").textContent=best; } }
+    raf=requestAnimationFrame(step);
+  }
+  function open(){ panel.style.display="flex"; reset(); if(!raf) step(); }
+  function close(){ panel.style.display="none"; if(raf){ cancelAnimationFrame(raf); raf=null; } }
+  fab.onclick=open; closeB.onclick=close;
+  cv.addEventListener("pointerdown",function(e){ e.preventDefault(); flap(); });
+  document.addEventListener("keydown",function(e){ if(panel.style.display!=="none" && (e.code==="Space"||e.code==="ArrowUp")){ e.preventDefault(); flap(); } });
+})();
+</script>
 <script id="kernel-src" type="text/plain">
 "use strict";
 
