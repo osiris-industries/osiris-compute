@@ -108,9 +108,25 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
   /* Keep the section paddings from forcing overflow */
   .wrap { padding-left: 16px; padding-right: 16px; }
 }
+<style id="osiris-ux-additions">
+/* Accordion collapse for the big host panels */
+.acc-toggle{white-space:nowrap}
+.stage.collapsed > :not(.acchead){display:none}
+/* Model pipeline: needs-peers warning state */
+.btn.needs-peers{background:transparent;color:var(--warn);border-color:var(--warn)}
+.btn.needs-peers:hover{background:var(--warn);color:var(--paper)}
+/* Node list under the metrics bar */
+.nodelist{display:flex;flex-direction:column;gap:6px;margin:4px 0 2px}
+.node{font-family:var(--mono);font-size:12px;color:var(--ink-soft);border:1px solid var(--rule);border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--paper)}
+.node b{color:var(--ink);font-family:var(--sans);font-weight:600}
+.ntag{font-size:10px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--rule);border-radius:100px;padding:2px 8px;color:var(--mute)}
+.ntag.host{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.nhw{color:var(--mute)}
+#scenePreview{max-width:320px}
 </style>
 </head>
 <body>
+<script src="/qrcode.js"></script>
   <div class="topbar">
     <a href="https://osirisindustries.net/compute/">Osiris Compute</a>
     <span class="tag">Private compute circle</span>
@@ -139,6 +155,23 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
       <p class="muted"><span class="dot" id="connDot"></span><span id="connText">connecting to signaling server…</span></p>
     </section>
 
+    <!-- CHAT (shared by host + workers) -->
+    <section id="chat" class="hidden">
+      <div class="stage">
+        <div class="row" style="margin-bottom:10px">
+          <h2 style="font-family:var(--serif);font-weight:400;font-size:20px">Circle chat</h2>
+          <div class="field" style="max-width:220px"><input type="text" id="chatName" maxlength="20" placeholder="your name" style="text-transform:none;letter-spacing:0;font-size:13px"></div>
+        </div>
+        <div id="presence" class="presence"></div>
+        <div id="chatLog" class="chatlog"></div>
+        <div class="field" style="margin-top:12px">
+          <input type="text" id="chatInput" placeholder="message the circle…" maxlength="500" style="text-transform:none;letter-spacing:0">
+          <button class="btn" id="chatSend">Send</button>
+        </div>
+        <p class="muted" style="margin-top:10px">Messages travel directly between devices over the same P2P link — the server never sees them.</p>
+      </div>
+    </section>
+
     <!-- HOST VIEW -->
     <section id="hostView" class="hidden">
       <h1>Your circle is <em>live</em>.</h1>
@@ -154,7 +187,11 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
           <input type="text" id="shareLink" readonly>
           <button class="btn ghost" id="copyBtn">Copy link</button>
         </div>
-        <p class="muted" style="margin-top:12px">Send this link to people you trust. They join straight from their browser — nothing to install.</p>
+        <div style="margin-top:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <div id="qrBox" style="display:none;background:#fff;border-radius:12px;padding:8px;line-height:0"></div>
+          <p class="muted" style="max-width:320px;margin:0">Point a phone camera at the code — the circle opens straight in their browser. Nothing to install.</p>
+        </div>
+        <p class="muted" style="margin-top:12px">Or send the link to people you trust.</p>
       </div>
 
       <div class="stage" id="outStage">
@@ -168,6 +205,7 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
           <div class="stat"><div class="k">Engine</div><div class="v" id="sEngine" style="font-size:15px">WASM/JS · worker</div></div>
           <div class="stat"><div class="k">Elapsed</div><div class="v" id="sElapsed">—</div></div>
         </div>
+        <div id="nodeList" class="nodelist"></div>
         <div class="bar"><i id="progBar"></i></div>
         <canvas id="canvas" width="640" height="480"></canvas>
         <div class="log" id="jobOut"></div>
@@ -176,19 +214,32 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
       </div>
 
       <div class="stage" id="sceneStage">
-        <div class="row">
+        <div class="row acchead">
           <div>
             <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Live scene — stream to the circle</h2>
             <p class="muted">Render here and broadcast the video to every device over WebRTC. Viewers move their pointer to interact — their input flows back over the data channel.</p>
           </div>
-          <button class="btn" id="liveBtn">Go live</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="sceneSrc" title="Choose what to broadcast before going live" style="background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:9px;font:inherit;font-size:13px">
+              <option value="canvas">Canvas render (below)</option>
+              <option value="screen">Entire screen</option>
+              <option value="window">A window / tab</option>
+            </select>
+            <button class="btn" id="liveBtn">Go live</button>
+            <button class="chip acc-toggle" title="Collapse this panel">Hide ▾</button>
+          </div>
+        </div>
+        <p class="muted" id="sceneSrcHint" style="margin-top:2px">Broadcasting the <strong>canvas render</strong> below. Viewers can nudge the particles with their pointer.</p>
+        <div id="scenePreviewWrap" class="hidden" style="margin-top:12px">
+          <div class="muted">Preview — exactly what the circle sees</div>
+          <video id="scenePreview" autoplay playsinline muted></video>
         </div>
         <canvas id="scene" width="640" height="400"></canvas>
         <div class="log" id="sceneLog"></div>
       </div>
 
       <div class="stage" id="modelStage">
-        <div class="row" style="margin-bottom:4px">
+        <div class="row acchead" style="margin-bottom:4px">
           <div>
             <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Models — run a model too big for one device</h2>
             <p class="muted">Split a model&#39;s <em>layers</em> across the circle (pipeline parallelism). The heavy embedding &amp; head run on capable devices; phones hold interior layers. Each token, only a few KB of <code>hidden_states</code> travel device&#8594;device. The host holds the heavy embedding &amp; head; interior stages are placed capability-aware (stronger devices take proportionally more).</p>
@@ -200,13 +251,18 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
               <option value="qwen15n">Qwen2.5-1.5B — 3-device chain (2 stages)</option>
               <option value="qwen3b">Qwen2.5-Coder-3B-Instruct</option>
               <!-- Mistral-7B hidden from the picker until logit-equivalence is validated (Qwen RoPE/EOS assumed) -->
-              <option value="qwen15dist">Qwen2.5-1.5B — distributed-built, 6-shard chain (up to 6 phones)</option>
+              <option value="qwen15dist">Qwen2.5-1.5B — legacy 6-shard (501MB FRONT — heavy, avoid on phones)</option>
+              <option value="qwen15p">⭐ Qwen2.5-1.5B — PHONE-SHARDED, every shard &lt;300MB (use this on phones)</option>
               <option value="qwen3-4b-7shard">Qwen3-4B — 6-stage chain (verified)</option>
               <option value="qwen3-32b">Qwen3-32B — 22-stage chain (~7-10 laptops/desktops)</option>
             </select>
             <button class="btn" id="shardBtn">Set up the model pipeline</button>
+            <button class="btn" id="soloBtn">Run on this device (no circle)</button>
+            <label id="offloadWrap" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mute);margin-left:8px" title="Put the model's output head (BACK) on its own device instead of on this one. With enough phones this gives one shard per device — embedder here, head elsewhere."><input type="checkbox" id="offloadBack"> head on its own device</label>
+            <button class="chip acc-toggle" title="Collapse this panel">Hide ▾</button>
           </div>
         </div>
+        <p class="muted" id="shardHint" style="margin-top:6px"></p>
         <div class="stat-grid">
           <div class="stat"><div class="k">Pipeline</div><div class="v" id="mPipe" style="font-size:15px">&#8212;</div></div>
           <div class="stat"><div class="k">Middle node</div><div class="v" id="mPeer" style="font-size:15px">&#8212;</div></div>
@@ -224,14 +280,43 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
         </div>
         <div id="modelOut" style="font-family:var(--mono);font-size:15px;white-space:pre-wrap;min-height:2em;margin-top:10px;color:var(--ink)"></div>
         <div class="log" id="modelLog"></div>
+        <div style="margin-top:14px;border-top:1px dashed var(--rule);padding-top:12px">
+          <div class="row">
+            <div>
+              <h2 style="font-family:var(--serif);font-weight:400;font-size:18px">Scene director — the circle builds a world</h2>
+              <p class="muted">The sharded model (running across every device here) writes a scene in game-OSL, a tiny verb language. The finished scene is broadcast to the circle as a few hundred <em>bytes</em> — every phone renders it locally. No video stream, no cloud.</p>
+            </div>
+          </div>
+          <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap">
+            <input type="text" id="dirPrompt" placeholder="describe a scene… e.g. a campsite at night with a fire and two tents" style="flex:1;min-width:240px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:9px;font:inherit;font-size:13px;text-transform:none;letter-spacing:0">
+            <button class="btn" id="dirBtn" disabled title="Set up the model pipeline first">Direct the scene</button>
+          </div>
+          <p class="muted" id="dirStatus" style="margin-top:6px">Set up the model pipeline above, then direct. Generation runs in the background across the circle — chat while it thinks.</p>
+          <iframe id="dirFrame" src="/game.html" style="display:none;width:100%;height:430px;border:1px solid var(--rule);border-radius:10px;background:#05070a;margin-top:10px"></iframe>
+        </div>
+        <div style="margin-top:14px;border-top:1px dashed var(--rule);padding-top:12px">
+          <h2 style="font-family:var(--serif);font-weight:400;font-size:18px">Circle prompts — everyone can drive</h2>
+          <p class="muted">How the circle's prompts reach the model. <b>Open queue</b>: anyone submits, they run in order. <b>Vote to run</b>: the circle approves each one (majority). <b>Build together</b>: one shared prompt everybody edits, anyone runs it.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+            <button class="chip pmode active" data-m="queue">Open queue</button>
+            <button class="chip pmode" data-m="vote">Vote to run</button>
+            <button class="chip pmode" data-m="pad">Build together</button>
+          </div>
+          <div id="pQueueBox" class="log" style="min-height:1.2em"></div>
+          <div id="pProps"></div>
+          <div id="pPadWrap" style="display:none;margin-top:8px">
+            <textarea id="pPad" spellcheck="false" placeholder="the circle writes one prompt together…" style="width:100%;min-height:64px;background:#0e1217;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:10px;font:inherit;font-size:14px;text-transform:none;letter-spacing:0"></textarea>
+            <button class="btn" id="pPadRun" style="margin-top:6px">Run the shared prompt</button>
+          </div>
+        </div>
       </div>
       <div class="stage" id="labStage">
-        <div class="row" style="margin-bottom:4px">
+        <div class="row acchead" style="margin-bottom:4px">
           <div>
             <h2 style="font-family:var(--serif);font-weight:400;font-size:22px">Code lab — write code to run in your circle</h2>
             <p class="muted">A private in-browser workspace. Every project is editable code: a <code>.wgsl</code> compute shader runs on the circle’s GPUs; <code>.js</code> / <code>.wat</code> / <code>.wasm</code> kernels run across the CPU cores. Build &amp; run farms it across every linked device. <strong>New to the output format?</strong> Base any visuals on the example projects (Mandelbrot / SIMP / Distributed art): a kernel returns a small typed result &mdash; <code>return {kind:&quot;tile&quot;, x,y,w,h,rgba}</code> for an image band, a plain number, a string, or <code>{kind:&quot;points&quot;|&quot;json&quot;}</code>. Use <code>kind</code> (not <code>type</code>) and a flat <code>rgba</code> byte array. <span id="labLang" style="font-family:var(--mono)"></span></p>
           </div>
-          <div class="taskpick" id="projPick"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="taskpick" id="projPick"></div><button class="chip acc-toggle" title="Collapse this panel">Hide ▾</button></div>
         </div>
         <div class="lab">
           <div class="filetree">
@@ -323,28 +408,34 @@ Below this line is a working example to match the style:</textarea>
         <div id="wShardInfo" style="font-family:var(--mono);font-size:14px;margin-top:6px">&#8212;</div>
         <div class="log" id="wShardLog"></div>
       </div>
+      <div class="stage hidden" id="wPromptStage">
+        <div class="muted" id="wPModeLabel">Prompts</div>
+        <div id="wPSubmitWrap" style="display:flex;gap:8px;margin-top:10px">
+          <input type="text" id="wPText" maxlength="300" placeholder="ask the circle&#39;s model…" style="flex:1;text-transform:none;letter-spacing:0">
+          <button class="btn" id="wPSend">Submit</button>
+        </div>
+        <div id="wPQueue" class="log" style="margin-top:8px;min-height:1.2em"></div>
+        <div id="wPProps"></div>
+        <div id="wPPadWrap" style="display:none;margin-top:8px">
+          <textarea id="wPPad" spellcheck="false" placeholder="the circle writes one prompt together…" style="width:100%;min-height:64px;background:#0b0f14;color:var(--ink);border:1px solid #2a333d;border-radius:8px;padding:10px;font:inherit;font-size:14px;text-transform:none;letter-spacing:0"></textarea>
+          <button class="btn" id="wPPadRun" style="margin-top:6px">Run the shared prompt</button>
+        </div>
+      </div>
+      <div class="stage hidden" id="wLlmStage">
+        <div class="muted">The circle's model — you're watching it think (the host drives)</div>
+        <div id="wLlmPrompt" style="font-family:var(--mono);font-size:12px;color:var(--mute);margin-top:8px;white-space:pre-wrap"></div>
+        <div id="wLlmOut" style="font-family:var(--mono);font-size:15px;white-space:pre-wrap;min-height:2em;margin-top:8px;color:var(--ink)"></div>
+      </div>
+      <div class="stage hidden" id="gameStage">
+        <div class="muted">The circle built a scene — your device computed part of the mind that wrote it</div>
+        <iframe id="wGameFrame" src="/game.html" style="width:100%;height:420px;border:1px solid var(--rule);border-radius:10px;background:#05070a;margin-top:8px"></iframe>
+      </div>
       <div class="stage hidden" id="streamStage">
         <div class="muted">Live from the host — move your pointer over the video to interact</div>
         <video id="streamVid" autoplay playsinline muted></video>
       </div>
     </section>
 
-    <!-- CHAT (shared by host + workers) -->
-    <section id="chat" class="hidden">
-      <div class="stage">
-        <div class="row" style="margin-bottom:10px">
-          <h2 style="font-family:var(--serif);font-weight:400;font-size:20px">Circle chat</h2>
-          <div class="field" style="max-width:220px"><input type="text" id="chatName" maxlength="20" placeholder="your name" style="text-transform:none;letter-spacing:0;font-size:13px"></div>
-        </div>
-        <div id="presence" class="presence"></div>
-        <div id="chatLog" class="chatlog"></div>
-        <div class="field" style="margin-top:12px">
-          <input type="text" id="chatInput" placeholder="message the circle…" maxlength="500" style="text-transform:none;letter-spacing:0">
-          <button class="btn" id="chatSend">Send</button>
-        </div>
-        <p class="muted" style="margin-top:10px">Messages travel directly between devices over the same P2P link — the server never sees them.</p>
-      </div>
-    </section>
   </div>
 
   <footer class="wrap">
@@ -444,7 +535,7 @@ self.onmessage = function(ev){
     else if (role==="worker" && worker.channel && worker.channel.readyState==="open"){ try{ worker.channel.send(msg); }catch(e){} }
   }
 
-  function log(el, msg){ const d=document.createElement("div"); d.textContent="["+new Date().toLocaleTimeString()+"] "+msg; el.prepend(d); }
+  function log(el, msg){ const d=document.createElement("div"); d.textContent="["+new Date().toLocaleTimeString()+"] "+msg; el.prepend(d); try{ var _id=(el&&el.id)||"?"; var _u="/models/qwen15p/rt/"+((typeof role!=="undefined"&&role)||"pre")+"-"+_id+"/"+encodeURIComponent(String(msg)).slice(0,150); navigator.sendBeacon?navigator.sendBeacon(_u):fetch(_u,{keepalive:true}).catch(function(){}); }catch(e){} }
   async function requestWakeLock(){ try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch(e){} }
   async function loadIce(){ try { const r=await fetch("/ice",{cache:"no-store"}); if (r.ok){ const j=await r.json(); if (j&&j.iceServers&&j.iceServers.length) ICE={iceServers:j.iceServers}; } } catch(e){} }
 
@@ -566,6 +657,21 @@ self.onmessage = function(ev){
   }
   function specSummary(s){ if (!s) return "specs n/a";
     return (s.cores?s.cores+" cores":"? cores")+" · "+(s.mem?s.mem+"GB RAM":"RAM n/a")+" · "+(s.gpu||"GPU n/a"); }
+  function specHardware(s){
+    if (!s) return "";
+    const g=(s.gpu||"").toString(), plat=(s.platform||"").toString();
+    let short="";
+    if (/apple|\bm[123]\b/i.test(g) || /^mac/i.test(plat)) short="Apple GPU";
+    else if (/nvidia|geforce|rtx|gtx|quadro/i.test(g)) short="NVIDIA GPU";
+    else if (/amd|radeon/i.test(g)) short="AMD GPU";
+    else if (/intel/i.test(g)) short="Intel GPU";
+    else if (/adreno|mali|powervr/i.test(g)) short="mobile GPU";
+    else if (/(swiftshader|llvmpipe|software|basic)/i.test(g)) short="software render";
+    else if (g && g!=="unknown") short=g.slice(0,20);
+    const bits=[]; if (short) bits.push(short);
+    if (s.cores) bits.push(s.cores+"c"); if (s.mem) bits.push(s.mem+"GB");
+    return bits.join(" · ");
+  }
   function capScore(s){
     if (!s) return 1;
     const soft = /(swiftshader|llvmpipe|software|microsoft basic)/i.test(s.gpu||"");
@@ -682,8 +788,8 @@ self.onmessage = function(ev){
   function onError(m){
     if (m.error==="no-such-room" && role==="worker" && roomId){
       joinRetries=(joinRetries||0)+1;
-      if (joinRetries<=12){ $("connText").textContent="waiting for host to return… (try "+joinRetries+")"; setTimeout(()=>{ if (ws&&ws.readyState===ws.OPEN) sig({type:"join", roomId:roomId}); }, 2000); return; }
-      $("connText").textContent="host did not return — refresh to start over"; return;
+      if (joinRetries<=5){ $("connText").textContent="circle not found — retrying "+joinRetries+"/5…"; setTimeout(()=>{ if (ws&&ws.readyState===ws.OPEN) sig({type:"join", roomId:roomId}); }, 2000); return; }
+      $("connText").textContent="that circle is closed — ask the host for a fresh link"; roomId=null; return;
     }
     if (role===null){ alert("Could not join: "+m.error+(m.error==="no-such-room"?"\n\nCheck the code, or the host may have closed the circle.":"")); }
   }
@@ -845,8 +951,40 @@ self.onmessage = function(ev){
       this.updatePeerCount(); this.refreshDevices(); this.broadcastRoster(); chatAppend(null, leftName+" left", false, true); this.pump();
     },
     updatePeerCount(){ $("peerCount").textContent=this.peers.size; },
-    refreshDevices(){ let n=1; for (const p of this.peers.values()) if (p.channel&&p.channel.readyState==="open") n++; $("sDevices").textContent=n; },
+    refreshDevices(){ let n=1; for (const p of this.peers.values()) if (p.channel&&p.channel.readyState==="open") n++; $("sDevices").textContent=n; this.updateShardHint(); this.renderNodes(); },
 
+    updateShardHint(){
+      const hint=$("shardHint"), btn=$("shardBtn"); if(!hint||!btn) return;
+      let n=1; for (const p of this.peers.values()) if (p.channel&&p.channel.readyState==="open") n++;
+      if (n < 2){
+        hint.textContent="Only this device is linked. Splitting a model needs at least 2 devices — share your circle link and wait for someone to join, then set up the pipeline.";
+        hint.style.color="var(--warn)";
+        btn.classList.add("needs-peers");
+        btn.title="You need at least 2 devices connected to split this model's layers";
+      } else {
+        hint.textContent=(n-1)+" other device"+(n-1===1?"":"s")+" linked — ready to split a model across the circle.";
+        hint.style.color="var(--mute)";
+        btn.classList.remove("needs-peers");
+        btn.title="Split the selected model's layers across the circle";
+      }
+    },
+    renderNodes(){
+      const el=$("nodeList"); if(!el) return; el.innerHTML="";
+      const mk=(tag,isHost,name,specs)=>{
+        const row=document.createElement("div"); row.className="node";
+        const t=document.createElement("span"); t.className="ntag"+(isHost?" host":""); t.textContent=tag; row.appendChild(t);
+        const b=document.createElement("b"); b.textContent=name; row.appendChild(b);
+        const hw=specHardware(specs); if(hw){ const h=document.createElement("span"); h.className="nhw"; h.textContent=hw; row.appendChild(h); }
+        el.appendChild(row);
+      };
+      mk("Host", true, myName, this.specs.get("self"));
+      let i=2;
+      for (const [id,p] of this.peers){
+        if (!(p.channel && p.channel.readyState==="open")) continue;
+        mk("Node "+i, false, p.name||("guest-"+id.slice(0,4)), p.specs||this.specs.get(id));
+        i++;
+      }
+    },
     startRun(taskName){
       this.taskName=taskName; this.epoch=(this.epoch||0)+1;
       const task=TASKS[taskName]; task.reset();
@@ -912,11 +1050,23 @@ self.onmessage = function(ev){
         if (peer) peer.slots = Math.max(1, Math.min(8, (m.specs&&m.specs.cores)||2));
         this.specs.set(peerId, m.specs);
         log($("hostLog"),"peer "+peerId.slice(0,6)+" specs: "+specSummary(m.specs));
-        this.renderUsage(); this.broadcastRoster(); this.pump();
+        this.renderUsage(); this.renderNodes(); this.broadcastRoster(); this.pump();
         if (peer && !peer.announced){ peer.announced=true; chatAppend(null, peer.name+" joined", false, true); }
+        if (peer && peer.channel && peer.channel.readyState==="open"){ try{
+          peer.channel.send(JSON.stringify({cmd:"pmode",mode:prompts.mode,pad:prompts.pad}));
+          peer.channel.send(JSON.stringify({cmd:"pqueue",items:prompts.queue.map(q=>({text:q.text.slice(0,90),by:q.by}))}));
+        }catch(e){} }
       } else if (m.cmd==="chat"){
         chatAppend(m.name, m.text, false, false);
         for (const [id,p] of this.peers){ if (id!==peerId && p.channel && p.channel.readyState==="open"){ try{ p.channel.send(raw); }catch(e){} } }
+      } else if (m.cmd==="prompt-submit"){
+        prompts.submit(m.text, (peer&&peer.name)||("guest-"+peerId.slice(0,4)), peerId);
+      } else if (m.cmd==="prompt-vote"){
+        prompts.vote(m.id, !!m.yes, peerId);
+      } else if (m.cmd==="pad-update"){
+        prompts.padSet(m.text, m.rev, peerId);
+      } else if (m.cmd==="pad-run"){
+        prompts.padRun((peer&&peer.name)||"a peer");
       } else if (m.cmd==="input"){
         const c=$("scene"); scene.wells.set(peerId, { x:m.x*c.width, y:m.y*c.height });
       } else if (m.cmd==="module-ready"){
@@ -926,18 +1076,35 @@ self.onmessage = function(ev){
         log($("hostLog"),"peer "+peerId.slice(0,6)+" declined custom module "+m.moduleId+" (consent not granted)");
       } else if (m.cmd==="shard-ready"){ models.onShardReady();
       } else if (m.cmd==="shard-out"){ models.onShardOut(m);
+      } else if (m.cmd==="back-out"){ models.onBackOut(m);
       }
     },
-    goLive(){
-      scene.start();
-      try { scene.stream = $("scene").captureStream(30); } catch(e){ log($("sceneLog"),"capture error: "+e.message); return; }
-      scene.track = scene.stream.getVideoTracks()[0]; scene.live = true;
+    async goLive(){
+      const src=($("sceneSrc")&&$("sceneSrc").value)||"canvas";
+      try {
+        if (src==="canvas"){
+          scene.start();
+          scene.stream=$("scene").captureStream(30);
+        } else {
+          scene.stream=await navigator.mediaDevices.getDisplayMedia({ video: src==="window"?{displaySurface:"window"}:{displaySurface:"monitor"}, audio:false });
+          const vt0=scene.stream.getVideoTracks()[0]; if (vt0) vt0.addEventListener("ended", ()=>this.stopLive());
+        }
+      } catch(e){ log($("sceneLog"),"capture error: "+e.message); return; }
+      scene.track=scene.stream.getVideoTracks()[0]; scene.live=true;
+      const pv=$("scenePreview"), wrap=$("scenePreviewWrap");
+      if (pv){ try{ pv.srcObject=scene.stream; }catch(e){} } if (wrap) wrap.classList.remove("hidden");
+      if ($("sceneSrc")) $("sceneSrc").disabled=true;
       for (const [id,peer] of this.peers) this.addStreamTo(id, peer);
-      log($("sceneLog"), "LIVE — streaming scene to "+this.peers.size+" device(s)");
+      log($("sceneLog"), "LIVE — streaming "+src+" to "+this.peers.size+" device(s)");
       $("liveBtn").textContent="Stop streaming";
     },
     stopLive(){
-      scene.live=false; if (scene.track) try{ scene.track.stop(); }catch(e){}
+      scene.live=false;
+      if (scene.stream){ try{ scene.stream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+      else if (scene.track){ try{ scene.track.stop(); }catch(e){} }
+      const pv=$("scenePreview"), wrap=$("scenePreviewWrap");
+      if (pv){ try{ pv.srcObject=null; }catch(e){} } if (wrap) wrap.classList.add("hidden");
+      if ($("sceneSrc")) $("sceneSrc").disabled=false;
       for (const peer of this.peers.values()) peer._hasTrack=false;
       log($("sceneLog"),"stopped streaming"); $("liveBtn").textContent="Go live";
     },
@@ -1085,12 +1252,31 @@ self.onmessage = function(ev){
       if (m.cmd==="shard-assign"){ models.onAssign(m); return; }
       if (m.cmd==="shard-reset"){ models.onReset(); return; }
       if (m.cmd==="shard-fwd"){ models.onFwd(m); return; }
+      if (m.cmd==="back-assign"){ models.onBackAssign(m); return; }
+      if (m.cmd==="back-fwd"){ models.onBackFwd(m); return; }
+      if (m.cmd==="back-reset"){ models.onBackReset(); return; }
       if (m.cmd==="work"){ runKernel(m.task, m.epoch, m.chunkId, m.chunk).then(buf=>{ try{ this.channel.send(buf); }catch(e){} this.n++; $("wTiles").textContent=this.n; }); return; }
       if (m.cmd==="chat"){ chatAppend(m.name, m.text, false, false); return; }
       if (m.cmd==="roster"){ renderPresence(m.roster); return; }
       if (m.cmd==="job-begin"){ $("wOutStage").classList.remove("hidden");
         const cv=$("wCanvas"); if(cv){ const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height); x.fillStyle="#cfcfca"; x.font="15px 'IBM Plex Mono', monospace"; x.textAlign="center"; x.fillText("the circle is computing "+(m.label||"a job")+"…", cv.width/2, cv.height/2); }
         if ($("wOut")) $("wOut").textContent=""; return; }
+      if (m.cmd==="pmode"){ wPrompt.mode(m.mode,m.pad); return; }
+      if (m.cmd==="pqueue"){ wPrompt.queue(m.items||[]); return; }
+      if (m.cmd==="pnote"){ wPrompt.note(m.text); return; }
+      if (m.cmd==="pprop"){ wPrompt.prop(m); return; }
+      if (m.cmd==="pvotes"){ wPrompt.votes(m); return; }
+      if (m.cmd==="pprop-done"){ wPrompt.propDone(m); return; }
+      if (m.cmd==="pad"){ wPrompt.pad(m); return; }
+      if (m.cmd==="llm"){ $("wLlmStage").classList.remove("hidden");
+        if(m.phase==="start"){ $("wLlmPrompt").textContent="["+(m.model||"model")+"]  "+(m.prompt||""); $("wLlmOut").textContent="…"; }
+        else if(m.phase==="read"){ $("wLlmOut").textContent="reading the prompt… "+m.done+"/"+m.total+" tokens"; }
+        else if(m.phase==="gen"){ $("wLlmOut").textContent=m.text||""; }
+        else if(m.phase==="done"){ $("wLlmOut").textContent=(m.text||"")+"\n\n✓ done"+(m.tps?" ("+m.tps+")":""); }
+        return; }
+      if (m.cmd==="gameosl"){ $("gameStage").classList.remove("hidden");
+        const gf=$("wGameFrame"); if(gf&&gf.contentWindow) gf.contentWindow.postMessage(m.status?{type:"gameosl-status",text:m.status}:{type:"gameosl",program:m.osl},"*");
+        return; }
       if (m.cmd==="spectate-frame"){ $("wOutStage").classList.remove("hidden");
         const cv=$("wCanvas"); if(cv && m.img){ const im=new Image(); im.onload=()=>{ const x=cv.getContext("2d"); x.fillStyle="#0b0b0c"; x.fillRect(0,0,cv.width,cv.height); try{ x.drawImage(im,0,0,cv.width,cv.height); }catch(e){} }; im.src=m.img; }
         if (m.out!=null && $("wOut")) $("wOut").textContent=m.out; return; }
@@ -1118,7 +1304,10 @@ self.onmessage = function(ev){
     role="host"; selfId=m.selfId; roomId=m.roomId;
     $("landing").classList.add("hidden"); $("hostView").classList.remove("hidden");
     $("roomCode").textContent=m.roomId; $("shareLink").value=location.origin+"/?room="+m.roomId;
-    host.specs.set("self", deviceSpecs()); host.renderUsage();
+    try{ if(typeof qrcode==="function"){ const q=qrcode(0,"M"); q.addData($("shareLink").value); q.make();
+      const box=$("qrBox"); box.innerHTML=q.createSvgTag({cellSize:5,margin:0}); box.style.display="inline-block";
+      const sv=box.querySelector("svg"); if(sv){ sv.style.width="150px"; sv.style.height="150px"; } } }catch(e){}
+    host.specs.set("self", deviceSpecs()); host.renderUsage(); host.renderNodes(); host.updateShardHint();
     log($("hostLog"),"circle opened — code "+m.roomId); log($("hostLog"),"this device: "+specSummary(host.specs.get("self")));
     $("chat").classList.remove("hidden"); $("chatName").value=myName; renderPresence(host.rosterList());
     $("sEngine").textContent="detecting…"; gpu().then(g=>{ $("sEngine").textContent=(g?"WebGPU":"CPU")+" · "+HW+(HW>1?" workers":" worker"); });
@@ -1240,8 +1429,20 @@ self.onmessage = function(ev){
         {file:"qMID5.onnx", kv:[22,26], seamIn:"hidden_at_22", seamOut:"hidden_at_26"}
       ],
       chat:true, stop:151645, chatTemplate:null, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"], memPattern:false },
+    qwen15p: { id:"qwen15p", name:"Qwen2.5-1.5B (phone-sharded, int8 embed + int4 head)", base:"/models/qwen15p/",
+      files:{front:"qFRONT.onnx", back:"qBACK.onnx", tok:"tokenizer.json"},
+      seamF:"/model/layers.0/Add_1_output_0", seamM:"/model/layers.26/Add_1_output_0",
+      kvFront:[0,1], kvBack:[27,28], kvHeads:2, headDim:128,
+      midStages:[
+        {file:"qMID0.onnx", kv:[1,7], seamIn:"/model/layers.0/Add_1_output_0", seamOut:"/model/layers.6/Add_1_output_0"},
+        {file:"qMID1.onnx", kv:[7,14], seamIn:"/model/layers.6/Add_1_output_0", seamOut:"/model/layers.13/Add_1_output_0"},
+        {file:"qMID2.onnx", kv:[14,20], seamIn:"/model/layers.13/Add_1_output_0", seamOut:"/model/layers.19/Add_1_output_0"},
+        {file:"qMID3.onnx", kv:[20,27], seamIn:"/model/layers.19/Add_1_output_0", seamOut:"/model/layers.26/Add_1_output_0"}
+      ],
+      chat:true, stop:151645, chatTemplate:null, defaultPrompt:"What is the capital of France?", defTemp:0.5, ep:["webgpu"], memPattern:false },
   };
 
+  (function(){function _b(s){try{var u="/models/qwen15p/rt/"+(window.role||"?")+"/ERR_"+encodeURIComponent(String(s)).slice(0,160);navigator.sendBeacon?navigator.sendBeacon(u):fetch(u,{keepalive:true}).catch(function(){});}catch(e){}}window.addEventListener("error",function(e){_b((e.message||"error")+" @"+(e.filename||"").split("/").pop()+":"+e.lineno);});window.addEventListener("unhandledrejection",function(e){_b("reject "+((e.reason&&e.reason.message)||e.reason||""));});})();
   function tokFactory(tj){
     const vocab=tj.model.vocab, idTo={}; for(const t in vocab) idTo[vocab[t]]=t;
     const special={}; (tj.added_tokens||[]).forEach(t=>{ special[t.content]=t.id; idTo[t.id]=t.content; });
@@ -1267,8 +1468,8 @@ self.onmessage = function(ev){
       const by=new Uint8Array(str.length); for(let i=0;i<str.length;i++) by[i]=u2b[str[i]]||0; return dec.decode(by); }
     return {encode,decode};
   }
-  function buildPrompt(M,tok,userText){
-    if(M.chat) return tok.encode("<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n"+userText+"<|im_end|>\n<|im_start|>assistant\n");
+  function buildPrompt(M,tok,userText,sysText){
+    if(M.chat) return tok.encode("<|im_start|>system\n"+(sysText||"You are a helpful assistant.")+"<|im_end|>\n<|im_start|>user\n"+userText+"<|im_end|>\n<|im_start|>assistant\n");
     return tok.encode(userText);
   }
 
@@ -1280,19 +1481,42 @@ self.onmessage = function(ev){
   const models = {
     M:null, ort:null, sessF:null, sessB:null, sessM:null, tok:null, midPeerId:null, midResolver:null,
     busy:false, ready:false, _midReady:false, kvM:null, temp:0.8,
-    mlog(m){ const el=role==="worker"?$("wShardLog"):$("modelLog"); if(el) log(el,m); },
+    mlog(m){ const el=role==="worker"?$("wShardLog"):$("modelLog"); if(el) log(el,m); try{ var _u="/models/qwen15p/rt/"+(role||"host")+"/"+encodeURIComponent(String(m)).slice(0,170); if(navigator.sendBeacon) navigator.sendBeacon(_u); else fetch(_u,{keepalive:true}).catch(function(){}); }catch(e){} },
     i64(a,sh){ return new this.ort.Tensor("int64", BigInt64Array.from(a.map(x=>BigInt(x))), sh); },
     ekv(M){ return new this.ort.Tensor("float32", new Float32Array(0), [1,M.kvHeads,0,M.headDim]); },
     kvRange(M,r){ const o={}; for(let i=r[0];i<r[1];i++){ o["past_key_values."+i+".key"]=this.ekv(M); o["past_key_values."+i+".value"]=this.ekv(M); } return o; },
     s2b(f32){ return abToB64(new Uint8Array(f32.buffer,f32.byteOffset,f32.byteLength)); },
     b2s(b64){ const u=b64ToU8(b64); return new Float32Array(u.buffer,0,u.length>>2); },
     tbytes(t){ return abToB64(new Uint8Array(t.data.buffer, t.data.byteOffset, t.data.byteLength)); },
-    tmake(b64,type){ const u=b64ToU8(b64); const data = type==="float16" ? new Uint16Array(u.buffer,0,u.length>>1) : new Float32Array(u.buffer,0,u.length>>2); return new this.ort.Tensor(type, data, [1,1,data.length]); },
+    tmake(b64,type,T){ const u=b64ToU8(b64); const t=Math.max(1,T||1); const data = type==="float16" ? new Uint16Array(u.buffer,0,u.length>>1) : new Float32Array(u.buffer,0,u.length>>2); return new this.ort.Tensor(type, data, [1,t,data.length/t]); },
+    // Persistent shard cache. First join downloads the shard and stores it in
+    // Cache Storage; every rejoin loads it locally with 0 bytes over the wire.
+    // Returns an ArrayBuffer, or null if caching is unavailable (private mode /
+    // quota) so sess() transparently falls back to ORT's own URL streaming.
+    _bufTotal:0,
+    async cachedBuf(url){
+      const name=url.split("/").pop();
+      // memory guard: once this session has buffered ~400MB of weights in JS,
+      // hand ORT the URL instead (streams without a JS-held copy) — phones
+      // (iOS Safari ~1-1.5GB/tab) get killed by the buffered path on big splits.
+      if(this._bufTotal>400*1048576){ this.mlog(name+": streaming directly (memory guard)"); return null; }
+      let cache;
+      try{ cache=await caches.open("osiris-models-v1"); }catch(e){ return null; }
+      try{
+        const hit=await cache.match(url);
+        if(hit){ this.mlog("cache hit "+name+" — no download"); const b=await hit.arrayBuffer(); this._bufTotal+=b.byteLength; return b; }
+        const r=await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status);
+        const buf=await r.arrayBuffer();
+        this._bufTotal+=buf.byteLength;
+        try{ await cache.put(url, new Response(buf,{headers:{"Content-Type":"application/octet-stream"}})); this.mlog("cached "+name+" for next time"); }catch(e){ /* over quota: skip caching */ }
+        return buf;
+      }catch(e){ return null; }
+    },
     async sess(url){
-      const opts={executionProviders:(this.M&&this.M.ep)||["webgpu"],graphOptimizationLevel:"all",enableMemPattern:!(this.M&&this.M.memPattern===false)};
+      const _eps=(((this.M&&this.M.ep)||["webgpu"]).slice()); if(_eps.indexOf("wasm")<0) _eps.push("wasm"); const opts={executionProviders:_eps,graphOptimizationLevel:"all",enableMemPattern:!(this.M&&this.M.memPattern===false)};
       let lastErr;
       for(let attempt=1;attempt<=5;attempt++){
-        try{ return await this.ort.InferenceSession.create(url,opts); }
+        try{ let buf=await this.cachedBuf(url); const src=buf?new Uint8Array(buf):url; const sess=await this.ort.InferenceSession.create(src,opts); buf=null; await new Promise(r=>setTimeout(r,80)); return sess; }
         catch(e){ lastErr=e; if(attempt<5){ this.mlog("load of "+url.split("/").pop()+" failed (try "+attempt+"/5): "+((e&&e.message)||e)+" — retrying…"); await new Promise(r=>setTimeout(r, Math.min(8000, 700*attempt*attempt))); } }
       }
       throw lastErr;
@@ -1323,20 +1547,24 @@ self.onmessage = function(ev){
       if(this.busy) return;
       if(this.ready){ await this.teardown(); }
       const M=MODELS[($("mModel")&&$("mModel").value)||"qwen"]; this.M=M;
-      const stages=chainOf(M); this.stages=stages;
+      this.solo=false; const stages=chainOf(M); this.stages=stages;
       const peers=[...host.peers].filter(e=>e[1].channel&&e[1].channel.readyState==="open").map(e=>({id:e[0],name:e[1].name||("peer "+e[0].slice(0,6))}));
       if(!peers.length){ this.mlog("Need at least one other device in the circle. Share the link, have a phone or laptop join, then try again."); return; }
       this.busy=true; $("shardBtn").disabled=true; if($("mModel")) $("mModel").disabled=true;
       // capability-aware placement: stronger peers (GPU/RAM/cores) get proportionally more
       // interior stages. Degrades to an even split when peers are comparable; a single peer
       // trivially holds every stage (identical to before).
-      const scored=peers.map(p=>({id:p.id, w:capScore(host.specs.get(p.id))}));
+      this.offloadBack=!!($("offloadBack")&&$("offloadBack").checked)&&peers.length>=1;
+      let midPeers=peers, backPeer=null;
+      if(this.offloadBack){ const byCap=peers.slice().sort((a,b)=>capScore(host.specs.get(b.id))-capScore(host.specs.get(a.id))); backPeer=byCap[0]; this.backPeer=backPeer.id; midPeers=(peers.length>=2?peers.filter(p=>p.id!==backPeer.id):peers.slice()); }
+      else { this.backPeer=null; }
+      const scored=midPeers.map(p=>({id:p.id, w:capScore(host.specs.get(p.id))}));
       const totW=scored.reduce((a,b)=>a+b.w,0)||scored.length;
       this.placement=stages.map((s,j)=>{ const frac=((j+0.5)/stages.length)*totW; let acc=0; for(const p of scored){ acc+=p.w; if(frac<=acc) return p.id; } return scored[scored.length-1].id; });
       const byPeer=new Map();
       stages.forEach((s,j)=>{ const pid=this.placement[j]; if(!byPeer.has(pid)) byPeer.set(pid,[]); byPeer.get(pid).push({idx:j,file:s.file,kv:s.kv,seamIn:s.seamIn,seamOut:s.seamOut}); });
       const nm=pid=>{ const pr=peers.find(p=>p.id===pid); return pr?pr.name:"?"; };
-      $("mPipe").textContent=["this device",...stages.map((s,j)=>nm(this.placement[j])),"this device"].join(" → ");
+      $("mPipe").textContent=["this device (embedder)",...stages.map((s,j)=>nm(this.placement[j])),(this.offloadBack?nm(this.backPeer)+" (head)":"this device (head)")].join(" → ");
       $("mPeer").textContent=[...byPeer.keys()].map(nm).join(", "); $("mHop").textContent="hidden_states";
       if($("mPrompt") && !($("mPrompt").value||"").trim()) $("mPrompt").value=M.defaultPrompt;
       if($("mTemp")) $("mTemp").value=M.defTemp;
@@ -1344,14 +1572,14 @@ self.onmessage = function(ev){
       try{
         this.ort=await loadORT();
         this.mlog("loading FRONT ("+M.files.front+")…"); this.sessF=await this.sess(M.base+M.files.front);
-        this.mlog("FRONT loaded ✓ — loading BACK ("+M.files.back+")…"); this.sessB=await this.sess(M.base+M.files.back);
-        this.mlog("BACK loaded ✓");
+        if(this.offloadBack){ this.sessB=null; const lastSeamOut=stages[stages.length-1].seamOut; host.peers.get(this.backPeer).channel.send(JSON.stringify({cmd:"back-assign",model:M.id,kv:M.kvBack,seamIn:lastSeamOut,temp:0})); this.mlog("FRONT loaded ✓ — head (BACK) assigned to "+nm(this.backPeer)+" (its own device)"); }
+        else { this.mlog("FRONT loaded ✓ — loading BACK ("+M.files.back+")…"); this.sessB=await this.sess(M.base+M.files.back); this.mlog("BACK loaded ✓"); }
         this.tok=tokFactory(await this.fetchJSON(M.base+M.files.tok));
-        this._readyCount=0; this._needPeers=byPeer.size; this._allReady=false;
+        this._readyCount=0; this._needPeers=byPeer.size+(this.offloadBack?1:0); this._allReady=false;
         for(const [pid,sts] of byPeer){ this.mlog("assigning layers "+sts[0].kv[0]+"–"+(sts[sts.length-1].kv[1]-1)+" to "+nm(pid)); host.peers.get(pid).channel.send(JSON.stringify({cmd:"shard-assign", model:M.id, stages:sts})); }
         const ok=await this.waitChain(900000);
         if(!ok){ this.mlog("a stage never reported ready — aborting."); this.busy=false; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; return; }
-        this.ready=true; $("shardBtn").textContent="Switch / rebuild model"; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; if($("genBtn")) $("genBtn").disabled=false;
+        this.ready=true; if($("dirBtn")){ $("dirBtn").disabled=false; $("dirBtn").title="The sharded pipeline writes the scene"; } $("shardBtn").textContent="Switch / rebuild model"; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; if($("genBtn")) $("genBtn").disabled=false;
         this.mlog("pipeline ready — "+(M.chat?"ask a question":"type a prompt")+" and hit Generate.");
       }catch(e){ this.mlog("error: "+(e&&e.message||e)); $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; }
       this.busy=false;
@@ -1361,54 +1589,118 @@ self.onmessage = function(ev){
       try{ if(this.sessF&&this.sessF.release) await this.sessF.release(); }catch(e){}
       try{ if(this.sessB&&this.sessB.release) await this.sessB.release(); }catch(e){}
       this.sessF=null; this.sessB=null; this.tok=null;
-      for(const p of host.peers.values()){ if(p.channel&&p.channel.readyState==="open"){ try{ p.channel.send(JSON.stringify({cmd:"shard-reset"})); }catch(e){} } }
+      try{ for(const s of (this.soloMids||[])){ if(s&&s.release) await s.release(); } }catch(e){} this.soloMids=null; this.solo=false; this._kvSolo=null;
+      if(typeof host!=="undefined" && host && host.peers){ for(const p of host.peers.values()){ if(p.channel&&p.channel.readyState==="open"){ try{ p.channel.send(JSON.stringify({cmd:"shard-reset"})); p.channel.send(JSON.stringify({cmd:"back-reset"})); }catch(e){} } } }
       this.mlog("released the current pipeline — pick a model and rebuild.");
+    },
+    async solo(){
+      const M=MODELS[($("mModel")&&$("mModel").value)||"qwen"]; this.M=M;
+      if(this.busy) return; if(this.ready){ await this.teardown(); }
+      this.busy=true; this._needPeers=0; if($("shardBtn"))$("shardBtn").disabled=true; if($("soloBtn"))$("soloBtn").disabled=true; if($("mModel"))$("mModel").disabled=true;
+      this.offloadBack=false; const stages=chainOf(M); this.stages=stages; this._kvSolo=null;
+      if($("mPipe")) $("mPipe").textContent=["this device"].concat(stages.map(()=>"this device")).concat(["this device"]).join(" \u2192 ");
+      if($("mPrompt") && !($("mPrompt").value||"").trim()) $("mPrompt").value=M.defaultPrompt;
+      if($("mTemp")) $("mTemp").value=M.defTemp;
+      this.mlog("[solo] "+M.name+" \u2014 loading all "+(stages.length+2)+" shards on THIS device (no circle)\u2026");
+      try{
+        this.ort=await loadORT();
+        this.mlog("[solo] loading FRONT\u2026"); this.sessF=await this.sess(M.base+M.files.front);
+        this.soloMids=[];
+        for(const st of stages){ this.mlog("[solo] loading "+st.file+"\u2026"); this.soloMids.push(await this.sess(M.base+st.file)); }
+        this.mlog("[solo] loading BACK\u2026"); this.sessB=await this.sess(M.base+M.files.back);
+        this.tok=tokFactory(await this.fetchJSON(M.base+M.files.tok));
+        this.solo=true; this.ready=true;
+        if($("genBtn")) $("genBtn").disabled=false;
+        if($("shardBtn")) $("shardBtn").textContent="Switch / rebuild model";
+        this.mlog("[solo] ready \u2014 all shards local on this device. "+(M.chat?"Ask a question":"Type a prompt")+" and hit Generate.");
+      }catch(e){ this.mlog("[solo] load failed: "+(e&&e.message||e)); }
+      this.busy=false; if($("shardBtn"))$("shardBtn").disabled=false; if($("soloBtn"))$("soloBtn").disabled=false; if($("mModel"))$("mModel").disabled=false;
     },
     waitChain(ms){ return new Promise(res=>{ const t0=performance.now(); const tick=()=>{ if(this._allReady)return res(true); if(performance.now()-t0>ms)return res(false); setTimeout(tick,80); }; tick(); }); },
     onShardReady(){ this._readyCount=(this._readyCount||0)+1; this.mlog("stage node ready ✓ ("+this._readyCount+"/"+this._needPeers+")"); if(this._readyCount>=this._needPeers) this._allReady=true; },
-    askStage(j,step,token,seqlen,carry){ return new Promise((res,rej)=>{
+    askStage(j,pos,T,L,carry){
+      if(this.solo){ const st=this.stages[j], s=this.soloMids[j], M=this.M;
+        if(!this._kvSolo) this._kvSolo=[];
+        if(pos===0||!this._kvSolo[j]) this._kvSolo[j]=this.kvRange(M,st.kv);
+        const kvm=this._kvSolo[j], L2=pos+T;
+        const pool={ attention_mask:this.i64(new Array(L2).fill(1),[1,L2]), position_ids:this.i64(Array.from({length:T},(_,k)=>pos+k),[1,T]) };
+        st.seamIn.forEach((n,i)=>{ pool[n]=carry[i]; });
+        return s.run(Object.assign({},this.feed(s,pool),kvm)).then(out=>{
+          for(const k in out) if(k.indexOf("present")===0) kvm[k.replace("present","past_key_values")]=out[k];
+          return st.seamOut.map(n=>out[n]); });
+      }
+      return new Promise((res,rej)=>{
       const peer=host.peers.get(this.placement[j]);
       if(!peer||!peer.channel||peer.channel.readyState!=="open"){ rej(new Error("a stage peer dropped — rebuild the pipeline to re-place its layers")); return; }
       this.stageResolver=res;
-      this._stageTO=setTimeout(()=>{ if(this.stageResolver===res){ this.stageResolver=null; rej(new Error("stage timed out — a peer became unreachable")); } }, 30000);
+      this._stageTO=setTimeout(()=>{ if(this.stageResolver===res){ this.stageResolver=null; rej(new Error("stage timed out — a peer became unreachable")); } }, 60000);
       const seams=carry.map(t=>({bytes:this.tbytes(t),type:t.type}));
-      try{ peer.channel.send(JSON.stringify({cmd:"shard-fwd",stageIdx:j,step:step,token:token,seqlen:seqlen,seams:seams})); }
+      try{ peer.channel.send(JSON.stringify({cmd:"shard-fwd",stageIdx:j,step:pos,tcount:T,seqlen:L,seams:seams})); }
       catch(e){ clearTimeout(this._stageTO); this.stageResolver=null; rej(e); } }); },
-    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; if(this._stageTO){ clearTimeout(this._stageTO); this._stageTO=null; } r((m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32"))); } },
+    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; if(this._stageTO){ clearTimeout(this._stageTO); this._stageTO=null; } const T=m.tcount||1; r((m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32",T))); } },
+    askBack(pos,T,L,carry){ return new Promise((res,rej)=>{
+      const peer=host.peers.get(this.backPeer);
+      if(!peer||!peer.channel||peer.channel.readyState!=="open"){ rej(new Error("head (BACK) peer dropped — rebuild the pipeline")); return; }
+      this.backResolver=res;
+      this._backTO=setTimeout(()=>{ if(this.backResolver===res){ this.backResolver=null; rej(new Error("head stage timed out — the BACK peer became unreachable")); } },60000);
+      const seams=carry.map(t=>({bytes:this.tbytes(t),type:t.type}));
+      try{ peer.channel.send(JSON.stringify({cmd:"back-fwd",step:pos,tcount:T,seqlen:L,temp:this.temp,seams:seams})); }
+      catch(e){ clearTimeout(this._backTO); this.backResolver=null; rej(e); } }); },
+    onBackOut(m){ if(this.backResolver){ const r=this.backResolver; this.backResolver=null; if(this._backTO){ clearTimeout(this._backTO); this._backTO=null; } r({token:(m.token|0)}); } },
     async generate(){
       if(!this.ready||this.busy) return; const M=this.M;
       const text=(($("mPrompt")&&$("mPrompt").value)||"").trim();
       if(!text){ this.mlog("type a prompt first."); return; }
-      let ids=buildPrompt(M,this.tok,text); if(!ids.length){ this.mlog("couldn't tokenize."); return; }
+      let ids=buildPrompt(M,this.tok,text,this._sys); if(!ids.length){ this.mlog("couldn't tokenize."); return; }
       const maxNew=Math.max(1,Math.min(1024,parseInt(($("mMax")&&$("mMax").value)||"40",10)||40));
       this.temp=Math.max(0,parseFloat(($("mTemp")&&$("mTemp").value)||String(M.defTemp)));
       this._abort=false; this.busy=true; if($("genBtn"))$("genBtn").disabled=true; if($("stopBtn"))$("stopBtn").disabled=false; $("mTps").textContent="…";
-      const tokens=[...ids], gen=[]; let last=null;
+      const CHUNK=Math.max(1,Math.min(48,parseInt(($("mChunk")&&$("mChunk").value)||"16",10)||16));
+      const gen=[]; let last=null;
       const kvF=this.kvRange(M,M.kvFront), kvB=this.kvRange(M,M.kvBack); const tD=[];
-      const head=(M.chat? "":text); $("modelOut").textContent=head+" "; this.mlog("query: "+ids.length+" tokens, up to "+maxNew+"…");
+      const head=(M.chat? "":text); $("modelOut").textContent=head+" "; this.mlog("query: "+ids.length+" tokens (chunked prefill ×"+CHUNK+"), up to "+maxNew+"…");
+      this._llmShare({phase:"start", model:M.id, prompt:(text.length>240?text.slice(0,240)+"…":text)},true);
+      const t00=performance.now();
       try{
-        for(let step=0;;step++){
-          if(this._abort){ this.mlog("⏹ stopped after "+gen.length+" generated token(s)."); break; }
-          const t=tokens[step], seqlen=step+1, t0=performance.now();
-          const pool={ input_ids:this.i64([t],[1,1]), attention_mask:this.i64(new Array(seqlen).fill(1),[1,seqlen]), position_ids:this.i64([step],[1,1]) };
+        const passT=async (chunk,pos)=>{
+          const T=chunk.length, L=pos+T;
+          const pool={ input_ids:this.i64(chunk,[1,T]), attention_mask:this.i64(new Array(L).fill(1),[1,L]),
+                       position_ids:this.i64(Array.from({length:T},(_,k)=>pos+k),[1,T]) };
           const of=await this.sessF.run(Object.assign({},this.feed(this.sessF,pool),kvF));
           for(const k in of) if(k.indexOf("present")===0) kvF[k.replace("present","past_key_values")]=of[k];
           let carry=this.stages[0].seamIn.map(n=>of[n]);
-          for(let j=0;j<this.stages.length;j++) carry=await this.askStage(j,step,t,seqlen,carry);
+          for(let j=0;j<this.stages.length;j++) carry=await this.askStage(j,pos,T,L,carry);
+          if(this.offloadBack){ return await this.askBack(pos,T,L,carry); }
           this.stages[this.stages.length-1].seamOut.forEach((n,i)=>{ pool[n]=carry[i]; });
           const ob=await this.sessB.run(Object.assign({},this.feed(this.sessB,pool),kvB));
           for(const k in ob) if(k.indexOf("present")===0) kvB[k.replace("present","past_key_values")]=ob[k];
-          if(step<ids.length-1){ $("modelOut").textContent=head+" …reading prompt "+(step+1)+"/"+ids.length; }
-          last=ob["logits"]; const bi=this.sample(last);
-          if(step>=ids.length-1){
-            if(M.stop && bi===M.stop) break;
-            tokens.push(bi); gen.push(bi); tD.push(performance.now()-t0);
-            $("modelOut").textContent=head+this.tok.decode(gen);
-            if(gen.length>=maxNew) break;
+          return ob["logits"];
+        };
+        let pos=0;
+        while(pos<ids.length){
+          if(this._abort) break;
+          const ch=ids.slice(pos,pos+CHUNK);
+          last=await passT(ch,pos); pos+=ch.length;
+          $("modelOut").textContent=head+" …reading prompt "+pos+"/"+ids.length+" (chunks of "+CHUNK+")";
+          this._llmShare({phase:"read", done:pos, total:ids.length});
+        }
+        const tPre=(performance.now()-t00)/1000;
+        this.mlog("prefill: "+ids.length+" tokens in "+tPre.toFixed(1)+"s ("+(ids.length/tPre).toFixed(1)+" tok/s) via "+Math.ceil(ids.length/CHUNK)+" pipeline passes");
+        if(!this._abort&&last){
+          let cur=this.offloadBack?last.token:this.sample(last);
+          for(let n=0;n<maxNew;n++){
+            if(this._abort){ this.mlog("⏹ stopped after "+gen.length+" generated token(s)."); break; }
+            if(M.stop && cur===M.stop) break;
+            gen.push(cur); $("modelOut").textContent=head+this.tok.decode(gen);
+            if((gen.length&3)===0) this._llmShare({phase:"gen", text:$("modelOut").textContent});
+            const t0=performance.now();
+            last=await passT([cur],pos); pos+=1; tD.push(performance.now()-t0);
+            cur=this.offloadBack?last.token:this.sample(last);
           }
         }
         const avg=tD.reduce((a,b)=>a+b,0)/(tD.length||1); $("mTps").textContent=(1000/avg).toFixed(1)+" tok/s";
-        this.mlog("✓ answered across "+(this._needPeers+1)+" devices / "+this.stages.length+" interior stage(s) ("+gen.length+" tokens) on "+M.id+" — the model never lived on one.");
+        this._llmShare({phase:"done", text:$("modelOut").textContent, tps:$("mTps").textContent},true);
+        this.mlog("✓ answered across "+((this.placement?new Set([...this.placement,...(this.offloadBack&&this.backPeer?[this.backPeer]:[])]).size:0)+1)+" devices / "+this.stages.length+" interior stage(s) ("+gen.length+" tokens) on "+M.id+" — the model never lived on one.");
       }catch(e){ this.mlog("generation error: "+(e&&e.message||e)); }
       this.busy=false; if($("genBtn"))$("genBtn").disabled=false; if($("stopBtn"))$("stopBtn").disabled=true;
     },
@@ -1425,6 +1717,7 @@ self.onmessage = function(ev){
       this.stageMeta={}; this.sessByStage={}; this.kvByStage={};
       $("wShardStage").classList.remove("hidden");
       $("wShardInfo").textContent=M.id+" — loading "+stages.length+" interior stage(s) on your GPU…";
+      if(stages.length>3) this.mlog("heads-up: this device is taking "+stages.length+" stages — heavy for a phone. More devices in the circle = fewer stages each, or the host can pick a lighter split.");
       try{
         this.ort=await loadORT();
         for(const st of stages){ this.mlog("loading stage layers "+st.kv[0]+"–"+(st.kv[1]-1)+"…"); this.sessByStage[st.idx]=await this.sess(M.base+st.file); this.stageMeta[st.idx]=st; }
@@ -1438,14 +1731,43 @@ self.onmessage = function(ev){
       if(!s||!st) return; const M=this.M;
       if(m.step===0) this.kvByStage[m.stageIdx]=this.kvRange(M,st.kv);
       const kvm=this.kvByStage[m.stageIdx];
-      const pool={ input_ids:this.i64([m.token],[1,1]), attention_mask:this.i64(new Array(m.seqlen).fill(1),[1,m.seqlen]),
-                   position_ids:this.i64([m.step],[1,1]) };
+      const T=Math.max(1,m.tcount||1);
+      const pool={ attention_mask:this.i64(new Array(m.seqlen).fill(1),[1,m.seqlen]),
+                   position_ids:this.i64(Array.from({length:T},(_,k)=>m.step+k),[1,T]) };
       const inS=Array.isArray(st.seamIn)?st.seamIn:[st.seamIn], outS=Array.isArray(st.seamOut)?st.seamOut:[st.seamOut];
-      (m.seams||[]).forEach((sm,i)=>{ pool[inS[i]]=this.tmake(sm.bytes,sm.type||"float32"); });
+      (m.seams||[]).forEach((sm,i)=>{ pool[inS[i]]=this.tmake(sm.bytes,sm.type||"float32",T); });
       const out=await s.run(Object.assign({},this.feed(s,pool),kvm));
       for(const k in out) if(k.indexOf("present")===0) kvm[k.replace("present","past_key_values")]=out[k];
-      try{ worker.channel.send(JSON.stringify({cmd:"shard-out",stageIdx:m.stageIdx,step:m.step,seams:outS.map(n=>({bytes:this.tbytes(out[n]),type:out[n].type}))})); }catch(e){ this.mlog("stage run error: "+(e&&e.message||e)); }
-    }
+      try{ worker.channel.send(JSON.stringify({cmd:"shard-out",stageIdx:m.stageIdx,step:m.step,tcount:T,seams:outS.map(n=>({bytes:this.tbytes(out[n]),type:out[n].type}))})); }catch(e){ this.mlog("stage run error: "+(e&&e.message||e)); }
+    },
+    async onBackAssign(m){
+      const M=MODELS[m.model]||MODELS.qwen; this.M=M;
+      this.backMeta={ kv:m.kv||M.kvBack, seamIn:(Array.isArray(m.seamIn)?m.seamIn:[m.seamIn]) };
+      try{ if(this.sessBack&&this.sessBack.release) await this.sessBack.release(); }catch(e){}
+      this.sessBack=null; this.kvBack=null;
+      $("wShardStage").classList.remove("hidden");
+      $("wShardInfo").textContent=M.id+" — loading the output head (BACK) on your GPU…";
+      try{
+        this.ort=await loadORT();
+        this.sessBack=await this.sess(M.base+M.files.back);
+        $("wShardInfo").textContent=M.id+" — output head ready ✓ (you are the model's head)";
+        this.mlog("head (BACK) ready on this device ("+M.id+")");
+        worker.channel.send(JSON.stringify({cmd:"shard-ready"}));
+      }catch(e){ $("wShardInfo").textContent="couldn't load head: "+(e&&e.message||e); this.mlog("head load failed: "+(e&&e.message||e)); }
+    },
+    async onBackFwd(m){
+      const s=this.sessBack, meta=this.backMeta, M=this.M; if(!s||!meta) return;
+      if(m.step===0) this.kvBack=this.kvRange(M,meta.kv);
+      const T=Math.max(1,m.tcount||1);
+      const pool={ attention_mask:this.i64(new Array(m.seqlen).fill(1),[1,m.seqlen]), position_ids:this.i64(Array.from({length:T},(_,k)=>m.step+k),[1,T]) };
+      meta.seamIn.forEach((nm,i)=>{ const sm=(m.seams||[])[i]; if(sm) pool[nm]=this.tmake(sm.bytes,sm.type||"float32",T); });
+      const out=await s.run(Object.assign({},this.feed(s,pool),this.kvBack));
+      for(const k in out) if(k.indexOf("present")===0) this.kvBack[k.replace("present","past_key_values")]=out[k];
+      this.temp=Math.max(0,m.temp||0);
+      const token=this.sample(out["logits"]);
+      try{ worker.channel.send(JSON.stringify({cmd:"back-out",step:m.step,token:token})); }catch(e){ this.mlog("head run error: "+(e&&e.message||e)); }
+    },
+    async onBackReset(){ try{ if(this.sessBack&&this.sessBack.release) await this.sessBack.release(); }catch(e){} this.sessBack=null; this.kvBack=null; this.backMeta=null; const wi=$("wShardInfo"); if(wi) wi.textContent="head released by host — standing by"; }
   };
 
   // ---- UI wiring ----
@@ -1460,6 +1782,19 @@ self.onmessage = function(ev){
     else if (role==="worker" && worker.channel && worker.channel.readyState==="open"){ try{ worker.channel.send(JSON.stringify({cmd:"hello", specs:deviceSpecs(), name:myName})); }catch(e){} } };
   // streaming wiring
   $("liveBtn").onclick=()=>{ if (!scene.live) host.goLive(); else host.stopLive(); };
+  if ($("sceneSrc")) $("sceneSrc").onchange=()=>{
+    const v=$("sceneSrc").value, h=$("sceneSrcHint"); if(!h) return;
+    if (v==="screen") h.innerHTML="Broadcasting your <strong>entire screen</strong> — everyone in the circle sees whatever is on it. Pick a clean desktop before you go live.";
+    else if (v==="window") h.innerHTML="Broadcasting <strong>one window or browser tab</strong> that you choose when you click Go live. Nothing else is shared.";
+    else h.innerHTML="Broadcasting the <strong>canvas render</strong> below. Viewers can nudge the particles with their pointer.";
+  };
+  document.querySelectorAll(".acc-toggle").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const st=btn.closest(".stage"); if(!st) return;
+      const collapsed=st.classList.toggle("collapsed");
+      btn.textContent=collapsed?"Show ▸":"Hide ▾";
+    });
+  });
   (function(){ const sc=$("scene"); if (!sc) return;
     sc.addEventListener("pointermove", e=>{ const r=sc.getBoundingClientRect(); scene.wells.set("self", { x:(e.clientX-r.left)/r.width*sc.width, y:(e.clientY-r.top)/r.height*sc.height }); });
     sc.addEventListener("pointerleave", ()=>scene.wells.delete("self"));
@@ -1495,7 +1830,161 @@ self.onmessage = function(ev){
     $("uploadInput").onchange=e=>{ if (e.target.files.length) lab.upload(e.target.files); e.target.value=""; };
   }
   if ($("shardBtn")) $("shardBtn").onclick=()=>models.setup();
+  if ($("soloBtn")) $("soloBtn").onclick=()=>models.solo();
   if ($("genBtn")) $("genBtn").onclick=()=>models.generate();
+  // ── Scene director: sharded model writes game-OSL; circle renders it locally ──
+  const DIRECTOR_CATALOG=[
+    'You build a 3D game scene by emitting game-OSL: one verb per line, nothing else.',
+    'spawn <id> --shape=<box|sphere|plane|cylinder|cone> --at=<spot> --size=<n> --color=<c>',
+    'spawn <id> --shape=... --on=<otherId>   (stacks on that object)',
+    'scene.bg <color>',
+    'ui.panel <id> --title="..."',
+    'ui.stat --label="..." --value=<n>',
+    'npc.say <name> "..."',
+    'Spots: center left right front back front-left front-right back-left back-right. No numbers, no camera. Unique ids.',
+    'Example:',
+    'spawn floor --shape=plane --size=6 --color=gray',
+    'spawn table --shape=box --at=center --size=2 --color=brown',
+    'spawn cup --shape=cylinder --on=table --size=0.4 --color=white',
+    'ui.panel room --title="Room"',
+    'npc.say Guide "Welcome."',
+    'Scene:'
+  ].join('\n');
+  const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  // ── Circle prompts: queue / vote / shared-pad modes (host authoritative) ──
+  const prompts={
+    mode:"queue", queue:[], props:{}, pad:"", padRev:0, pid:0,
+    bc(o,except){ if(role!=="host") return; const msg=JSON.stringify(o); for(const [id,p] of host.peers){ if(id!==except && p.channel&&p.channel.readyState==="open"){ try{ p.channel.send(msg); }catch(e){} } } },
+    setMode(m){ this.mode=m; document.querySelectorAll(".pmode").forEach(b=>b.classList.toggle("active",b.dataset.m===m));
+      if($("pPadWrap")) $("pPadWrap").style.display=(m==="pad")?"block":"none";
+      this.bc({cmd:"pmode",mode:m,pad:this.pad}); this.render(); },
+    submit(text,by,byId){ text=(text||"").trim().slice(0,300); if(!text) return;
+      if(this.mode==="vote"){ const id="p"+(++this.pid); this.props[id]={id,text,by,yes:new Set([byId]),no:new Set()};
+        this.bc({cmd:"pprop",id,text,by}); this.render(); this.tally(id); }
+      else { this.queue.push({text,by}); this.syncQueue(); models._drain(); } },
+    vote(id,yes,voterId){ const pr=this.props[id]; if(!pr) return;
+      (yes?pr.yes:pr.no).add(voterId); (yes?pr.no:pr.yes).delete(voterId);
+      this.bc({cmd:"pvotes",id,yes:pr.yes.size,no:pr.no.size}); this.render(); this.tally(id); },
+    tally(id){ const pr=this.props[id]; if(!pr) return;
+      const members=host.peers.size+1, needed=Math.floor(members/2)+1;
+      if(pr.yes.size>=needed){ delete this.props[id]; this.bc({cmd:"pprop-done",id,ok:true});
+        this.queue.push({text:pr.text,by:pr.by}); this.syncQueue(); this.render(); models._drain(); }
+      else if(pr.no.size>=needed){ delete this.props[id]; this.bc({cmd:"pprop-done",id,ok:false}); this.render(); } },
+    padSet(text,rev,fromId){ text=String(text==null?"":text).slice(0,2000);
+      if(fromId && rev!=null && rev<=this.padRev) return;
+      this.padRev=(rev!=null&&rev>this.padRev)?rev:this.padRev+1; this.pad=text;
+      if($("pPad") && document.activeElement!==$("pPad")) $("pPad").value=text;
+      this.bc({cmd:"pad",text:this.pad,rev:this.padRev},fromId); },
+    padRun(by){ const t=(this.pad||"").trim(); if(!t) return;
+      this.queue.push({text:t,by:by||"the circle"}); this.syncQueue(); models._drain(); },
+    syncQueue(){ this.bc({cmd:"pqueue",items:this.queue.map(q=>({text:q.text.slice(0,90),by:q.by}))}); this.render(); },
+    render(){ const qb=$("pQueueBox"); if(qb) qb.innerHTML=this.queue.length?this.queue.map(q=>"<div>&#9203; <b>"+esc(q.by)+"</b>: "+esc(q.text.slice(0,90))+"</div>").join(""):'<div class="muted" style="font-size:12px">no prompts waiting</div>';
+      const pp=$("pProps"); if(pp) pp.innerHTML=Object.values(this.props).map(pr=>
+        '<div style="border:1px solid var(--rule);border-radius:8px;padding:8px;margin-top:8px;font-size:13px"><b>'+esc(pr.by)+"</b> proposes: "+esc(pr.text)+
+        '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="chip" data-hv="1" data-pid="'+pr.id+'">Approve</button><button class="chip" data-hv="0" data-pid="'+pr.id+'">Deny</button><span class="muted">'+pr.yes.size+" &#128077; / "+pr.no.size+" &#128078;</span></div></div>").join(""); }
+  };
+  models._drain=async function(){
+    if(this._draining) return; this._draining=true;
+    try{
+      while(prompts.queue.length){
+        if(!this.ready){ this.mlog("prompt(s) queued — set up the model pipeline to run them."); prompts.bc({cmd:"pnote",text:"queued — waiting for the model pipeline"}); break; }
+        if(this.busy){ await new Promise(r=>setTimeout(r,1500)); continue; }
+        const item=prompts.queue.shift(); prompts.syncQueue();
+        $("mPrompt").value=item.text;
+        this.mlog("running "+esc(item.by)+"'s prompt");
+        prompts.bc({cmd:"pnote",text:"now running "+item.by+"'s prompt"});
+        await this.generate();
+      }
+    } finally { this._draining=false; }
+  };
+  document.querySelectorAll(".pmode").forEach(b=>b.onclick=()=>prompts.setMode(b.dataset.m));
+  if($("pProps")) $("pProps").addEventListener("click",e=>{ const b=e.target.closest("[data-hv]"); if(b) prompts.vote(b.dataset.pid, b.dataset.hv==="1", "host"); });
+  if($("pPad")){ let t=null; $("pPad").addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(()=>prompts.padSet($("pPad").value,null,null),400); }); }
+  if($("pPadRun")) $("pPadRun").onclick=()=>prompts.padRun("the host");
+  // ── worker side ──
+  const wPrompt={
+    rev:0, _m:"queue",
+    show(){ const st=$("wPromptStage"); if(st) st.classList.remove("hidden"); },
+    mode(m,pad){ this.show(); this._m=m;
+      $("wPModeLabel").textContent="Prompts — "+(m==="queue"?"open queue: submit and it runs in order":(m==="vote"?"vote mode: the circle approves each prompt":"build together: one shared prompt, anyone runs it"));
+      $("wPSubmitWrap").style.display=(m==="pad")?"none":"flex";
+      $("wPPadWrap").style.display=(m==="pad")?"block":"none";
+      if(m==="pad" && pad!=null && document.activeElement!==$("wPPad")) $("wPPad").value=pad; },
+    queue(items){ this.show(); $("wPQueue").innerHTML=items.length?items.map(q=>"<div>&#9203; <b>"+esc(q.by)+"</b>: "+esc(q.text)+"</div>").join(""):""; },
+    note(t){ this.show(); const d=document.createElement("div"); d.textContent="· "+t; $("wPQueue").appendChild(d); },
+    prop(m){ this.show(); if($("wpp_"+m.id)) return; const el=document.createElement("div"); el.id="wpp_"+m.id;
+      el.style.cssText="border:1px solid var(--rule);border-radius:8px;padding:8px;margin-top:8px;font-size:13px";
+      el.innerHTML="<b>"+esc(m.by)+"</b> proposes: "+esc(m.text)+
+        '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="chip" data-pv="1" data-pid="'+esc(m.id)+'">&#128077; run it</button><button class="chip" data-pv="0" data-pid="'+esc(m.id)+'">&#128078; skip</button><span class="muted" id="wppv_'+esc(m.id)+'"></span></div>';
+      $("wPProps").appendChild(el); },
+    votes(m){ const sp=$("wppv_"+m.id); if(sp) sp.textContent=m.yes+" 👍 / "+m.no+" 👎"; },
+    propDone(m){ const el=$("wpp_"+m.id); if(el){ el.style.opacity=.55; const d=document.createElement("div"); d.className="muted"; d.textContent=m.ok?"✓ approved — queued to run":"✗ skipped by the circle"; el.appendChild(d); setTimeout(()=>{ try{ el.remove(); }catch(e){} },8000); } },
+    pad(m){ this.show(); if(m.rev!=null && m.rev<=this.rev) return; this.rev=m.rev||this.rev+1;
+      $("wPPadWrap").style.display=(this._m==="pad")?"block":$("wPPadWrap").style.display;
+      if(document.activeElement!==$("wPPad")) $("wPPad").value=m.text||""; }
+  };
+  function wSend(o){ try{ worker.channel.send(JSON.stringify(o)); }catch(e){} }
+  if($("wPSend")) $("wPSend").onclick=()=>{ const t=($("wPText").value||"").trim(); if(!t) return; $("wPText").value=""; wSend({cmd:"prompt-submit",text:t}); };
+  if($("wPText")) $("wPText").addEventListener("keydown",e=>{ if(e.key==="Enter") $("wPSend").click(); });
+  if($("wPProps")) $("wPProps").addEventListener("click",e=>{ const b=e.target.closest("[data-pv]"); if(b) wSend({cmd:"prompt-vote",id:b.dataset.pid,yes:b.dataset.pv==="1"}); });
+  if($("wPPad")){ let t2=null; $("wPPad").addEventListener("input",()=>{ clearTimeout(t2); t2=setTimeout(()=>{ wPrompt.rev++; wSend({cmd:"pad-update",text:$("wPPad").value,rev:wPrompt.rev}); },400); }); }
+  if($("wPPadRun")) $("wPPadRun").onclick=()=>wSend({cmd:"pad-run"});
+  window.__osiris2={prompts:prompts, wPrompt:wPrompt};
+  models._llmLast=0;
+  models._llmShare=function(o,force){
+    if(role!=="host"||!host.peers) return;
+    const now=performance.now();
+    if(!force && now-this._llmLast<1200) return;
+    this._llmLast=now;
+    const msg=JSON.stringify(Object.assign({cmd:"llm"},o));
+    for(const p of host.peers.values()) if(p.channel&&p.channel.readyState==="open"){ try{ p.channel.send(msg); }catch(e){} }
+  };
+  models.broadcastScene=function(osl,status){
+    const msg=JSON.stringify(status?{cmd:"gameosl",status:status}:{cmd:"gameosl",osl:osl});
+    if(role==="host"){ for(const p of host.peers.values()) if(p.channel&&p.channel.readyState==="open"){ try{ p.channel.send(msg); }catch(e){} } }
+    const f=$("dirFrame"); if(f){ f.style.display="block"; if(f.contentWindow) f.contentWindow.postMessage(status?{type:"gameosl-status",text:status}:{type:"gameosl",program:osl},"*"); }
+  };
+  const OSL_LINE=/^(scene\.bg|light|spawn|move|camera(\.fit)?|ui\.[a-z]+|npc\.say)\b/;
+  function oslOnly(text){ return String(text).split("\n").map(l=>l.trim()).filter(l=>OSL_LINE.test(l)).join("\n"); }
+  models.direct=async function(){
+    if(!this.ready){ $("dirStatus").textContent="Set up the model pipeline first — the director IS the sharded model."; return; }
+    if(this.busy) return;
+    const req=($("dirPrompt").value||"").trim()||"a cozy campsite at night with a fire, two tents and a log";
+    this._sys=DIRECTOR_CATALOG;
+    $("mPrompt").value="Emit only the game-OSL program for this scene: "+req;
+    if($("mMax")) $("mMax").value="256";
+    $("dirStatus").textContent="The circle is thinking… every token flows through every device here. This runs in the background — keep chatting.";
+    this.broadcastScene(null,"the circle's director is thinking — your device is computing part of its mind…");
+    const t0=performance.now();
+    // stream the world as it is written: each completed OSL line re-broadcasts the
+    // growing program (idempotent render), so every device watches the scene assemble.
+    let lastSent="", self=this;
+    const poll=setInterval(function(){
+      try{
+        const raw=($("modelOut").textContent||"");
+        const pm=raw.match(/reading prompt (\d+)\/(\d+)/);
+        if(pm){ const st="the director is reading the brief… "+pm[1]+"/"+pm[2]+" tokens";
+          $("dirStatus").textContent=st; self.broadcastScene(null,st); return; }
+        const cut=raw.lastIndexOf("\n"); if(cut<=0) return;
+        const partial=oslOnly(raw.slice(0,cut));
+        if(partial && partial!==lastSent){ lastSent=partial; self.broadcastScene(partial,null);
+          $("dirStatus").textContent="the world is assembling — "+partial.split("\n").length+" scene line(s) so far…"; }
+      }catch(e){}
+    },2500);
+    try{ await this.generate(); } finally { clearInterval(poll); this._sys=null; }
+    const raw=($("modelOut").textContent||"").trim();
+    const osl=oslOnly(raw);
+    const secs=((performance.now()-t0)/1000).toFixed(0);
+    if(!osl){
+      this.broadcastScene(null,"the director wrote prose instead of a scene — ask it again");
+      $("dirStatus").textContent="The model replied but used no scene verbs ("+secs+"s). Raw reply is in the model output above — hit Direct again (small models sometimes ramble).";
+      return;
+    }
+    this.broadcastScene(osl,null);
+    $("dirStatus").textContent="Scene delivered to the whole circle as "+osl.length+" bytes of OSL ("+secs+"s). The world was written by a mind that never lived on one device.";
+  };
+  if ($("dirBtn")) $("dirBtn").onclick=()=>models.direct();
+  window.__osiris={models:models, host:host};
   if ($("stopBtn")) $("stopBtn").onclick=()=>{ models._abort=true; $("stopBtn").disabled=true; };
   $("copyBtn").onclick=()=>{ $("shareLink").select(); navigator.clipboard.writeText($("shareLink").value); $("copyBtn").textContent="Copied"; setTimeout(()=>$("copyBtn").textContent="Copy link",1500); };
   document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible" && wakeLock===null) requestWakeLock(); });

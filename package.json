@@ -1,6 +1,6 @@
 {
   "name": "osiris-compute",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser-based peer-to-peer public compute utility \u2014 pool idle devices into private circles, run models too big for one device. No install, no crypto, no data center.",
   "license": "AGPL-3.0-or-later",
   "type": "commonjs",

@@ -202,7 +202,7 @@ wss.on('connection', (ws, req) => {
   ws.peerId = randId(8);
   ws.roomId = null; ws.role = null; ws.isAlive = true; ws.caps = null;
   ws.on('pong', () => { ws.isAlive = true; });
-  logE('conn-open', sid(ws.peerId), 'from', (req.headers['x-real-ip'] || req.socket.remoteAddress || '?'));
+  logE('conn-open', sid(ws.peerId)); // privacy: client IP intentionally not logged
 
   ws.on('message', (raw) => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
