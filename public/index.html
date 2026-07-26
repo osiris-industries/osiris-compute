@@ -565,7 +565,7 @@ function makePacketRun(cv, sEl, bEl, opts){
   }
   var api={ setActive:function(on){ active=on; if(on){ reset(); paused=false; if(!raf) raf=requestAnimationFrame(loop); } else if(raf){ cancelAnimationFrame(raf); raf=null; } }, pause:function(){ if(active) paused=!paused; } };
   cv.addEventListener("pointerdown", function(e){ e.preventDefault(); if(!active){ api.setActive(true); return; } flap(); });
-  document.addEventListener("keydown", function(e){ if(active && (e.code==="Space"||e.code==="ArrowUp")){ e.preventDefault(); flap(); } });
+  document.addEventListener("keydown", function(e){ if(!active) return; if(e.code!=="Space" && e.code!=="ArrowUp") return; var el=e.target, tg=el&&el.tagName; if(tg==="INPUT"||tg==="TEXTAREA"||tg==="SELECT"||(el&&el.isContentEditable)) return; e.preventDefault(); flap(); });
   return api;
 }
 window.__pg = makePacketRun(document.getElementById("pgCanvas"), document.getElementById("pgScore"), document.getElementById("pgBest"), {onBest:pgReport});
