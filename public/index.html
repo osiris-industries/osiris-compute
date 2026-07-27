@@ -589,21 +589,22 @@ window.__pgw = makePacketRun(document.getElementById("pgwCanvas"), document.getE
   // NPC brain bridge: the prison iframe asks the running qwen15p pipeline (solo OR circle) for a reply.
   window.osirisGenerate = async function(userText, sys, opts){
     opts=opts||{};
-    if(typeof models==="undefined" || !models.ready) throw new Error("model not ready");
-    if(models.busy) throw new Error("model busy");
-    var pS=models._sys, pM=($("mMax")?$("mMax").value:null), pP=($("mPrompt")?$("mPrompt").value:null), pT=($("mTemp")?$("mTemp").value:null);
+    var M = window.__osiris && window.__osiris.models, G=function(id){return document.getElementById(id);};
+    if(!M || !M.ready) throw new Error("model not ready");
+    if(M.busy) throw new Error("model busy");
+    var pS=M._sys, pM=(G("mMax")?G("mMax").value:null), pP=(G("mPrompt")?G("mPrompt").value:null), pT=(G("mTemp")?G("mTemp").value:null);
     try{
-      models._sys = sys||null;
-      if($("mMax")) $("mMax").value = String(opts.max||70);
-      if($("mTemp") && opts.temp!=null) $("mTemp").value = String(opts.temp);
-      if($("mPrompt")) $("mPrompt").value = userText;
-      await models.generate();
-      return (($("modelOut")&&$("modelOut").textContent)||"").trim();
+      M._sys = sys||null;
+      if(G("mMax")) G("mMax").value = String(opts.max||70);
+      if(G("mTemp") && opts.temp!=null) G("mTemp").value = String(opts.temp);
+      if(G("mPrompt")) G("mPrompt").value = userText;
+      await M.generate();
+      return ((G("modelOut")&&G("modelOut").textContent)||"").trim();
     } finally {
-      models._sys = pS||null;
-      if($("mMax")&&pM!=null) $("mMax").value=pM;
-      if($("mTemp")&&pT!=null) $("mTemp").value=pT;
-      if($("mPrompt")&&pP!=null) $("mPrompt").value=pP;
+      M._sys = pS||null;
+      if(G("mMax")&&pM!=null) G("mMax").value=pM;
+      if(G("mTemp")&&pT!=null) G("mTemp").value=pT;
+      if(G("mPrompt")&&pP!=null) G("mPrompt").value=pP;
     }
   };
   window.addEventListener("message", function(e){
