@@ -335,7 +335,7 @@ select, input, textarea { max-width: 100%; box-sizing: border-box; }
           <span class="pill">score&nbsp;<span id="pgScore">0</span> &middot; best&nbsp;<span id="pgBest">0</span></span>
         </div>
         <p class="muted">Splitting a model across devices takes a little longer than a cloud service &mdash; so pass the time. Runs on your CPU, never the GPU the circle needs.</p>
-        <div style="margin:2px 0 8px"><button class="chip" onclick="window.open('/games/prison/index.html','_blank')">▸ Prison Yard — La Sombra (beta)</button></div>
+        <div style="margin:2px 0 8px"><button class="chip" onclick="openPrison()">▸ Prison Yard — La Sombra (beta)</button></div>
         <canvas id="pgCanvas" width="440" height="480" style="max-width:440px;touch-action:none"></canvas>
         <div class="row" style="margin-top:8px"><span class="muted">Tap / click / space to fly.</span><button class="chip" id="pgPause">Pause</button></div>
         <div class="muted" style="margin-top:12px">Circle scoreboard</div>
@@ -435,7 +435,7 @@ Below this line is a working example to match the style:</textarea>
           <span class="pill">score&nbsp;<span id="pgwScore">0</span> &middot; best&nbsp;<span id="pgwBest">0</span></span>
         </div>
         <p class="muted">Your device is downloading its shard and helping the circle think &mdash; pass the time. Runs on your CPU, never the GPU the circle needs.</p>
-        <div style="margin:2px 0 8px"><button class="chip" onclick="window.open('/games/prison/index.html','_blank')">▸ Prison Yard — La Sombra (beta)</button></div>
+        <div style="margin:2px 0 8px"><button class="chip" onclick="openPrison()">▸ Prison Yard — La Sombra (beta)</button></div>
         <canvas id="pgwCanvas" width="440" height="480" style="max-width:440px;touch-action:none"></canvas>
         <div class="row" style="margin-top:8px"><span class="muted">Tap / click / space to fly.</span><button class="chip" id="pgwPause">Pause</button></div>
         <div class="muted" style="margin-top:12px">Circle scoreboard</div>
@@ -578,6 +578,39 @@ window.__pg = makePacketRun(document.getElementById("pgCanvas"), document.getEle
 (function(){ var b=document.getElementById("advToggle"); if(!b) return;
   b.addEventListener("click", function(){ var ms=document.getElementById("modelStage"); if(ms){ ms.classList.toggle("adv-open"); b.classList.toggle("active"); } }); })();
 window.__pgw = makePacketRun(document.getElementById("pgwCanvas"), document.getElementById("pgwScore"), document.getElementById("pgwBest"), {onBest:pgReport});
+</script>
+<div id="prisonOverlay" style="display:none;position:fixed;inset:0;z-index:90;background:#000">
+  <button onclick="closePrison()" style="position:fixed;top:10px;right:12px;z-index:91;background:#12212e;color:#e8eef2;border:1px solid #2a4356;border-radius:20px;padding:8px 14px;font:inherit;font-size:14px">&#10005; Exit</button>
+  <iframe id="prisonFrame" style="width:100%;height:100%;border:0;display:block"></iframe>
+</div>
+<script>
+  function openPrison(){ var o=document.getElementById("prisonOverlay"), fr=document.getElementById("prisonFrame"); if(!fr.getAttribute("src")) fr.setAttribute("src","/games/prison/index.html"); o.style.display="block"; }
+  function closePrison(){ document.getElementById("prisonOverlay").style.display="none"; }
+  // NPC brain bridge: the prison iframe asks the running qwen15p pipeline (solo OR circle) for a reply.
+  window.osirisGenerate = async function(userText, sys, opts){
+    opts=opts||{};
+    if(typeof models==="undefined" || !models.ready) throw new Error("model not ready");
+    if(models.busy) throw new Error("model busy");
+    var pS=models._sys, pM=($("mMax")?$("mMax").value:null), pP=($("mPrompt")?$("mPrompt").value:null), pT=($("mTemp")?$("mTemp").value:null);
+    try{
+      models._sys = sys||null;
+      if($("mMax")) $("mMax").value = String(opts.max||70);
+      if($("mTemp") && opts.temp!=null) $("mTemp").value = String(opts.temp);
+      if($("mPrompt")) $("mPrompt").value = userText;
+      await models.generate();
+      return (($("modelOut")&&$("modelOut").textContent)||"").trim();
+    } finally {
+      models._sys = pS||null;
+      if($("mMax")&&pM!=null) $("mMax").value=pM;
+      if($("mTemp")&&pT!=null) $("mTemp").value=pT;
+      if($("mPrompt")&&pP!=null) $("mPrompt").value=pP;
+    }
+  };
+  window.addEventListener("message", function(e){
+    var m=e.data; if(!m || m.type!=="osiris-npc") return;
+    var reply=function(text,err){ try{ e.source.postMessage({type:"osiris-npc-reply", id:m.id, text:text, error:err}, "*"); }catch(x){} };
+    window.osirisGenerate(m.userText, m.sys, {max:m.max, temp:m.temp}).then(function(t){ reply(t,null); }).catch(function(err){ reply(null, String((err&&err.message)||err)); });
+  });
 </script>
 <script id="kernel-src" type="text/plain">
 "use strict";
