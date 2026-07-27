@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Osiris — La Sombra (prison)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#0b0b0c;overflow:hidden;font-family:'IBM Plex Mono',ui-monospace,monospace;color:#f1f1ef;-webkit-user-select:none;user-select:none}
+  #stage{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+  .hint{position:fixed;left:50%;top:12px;transform:translateX(-50%);font-size:12px;color:#cfcfca;background:rgba(11,11,12,.7);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:6px 12px;pointer-events:none;z-index:5}
+  /* touch controls */
+  #pad{position:fixed;left:14px;bottom:14px;width:132px;height:132px;z-index:6;opacity:.85}
+  #pad button{position:absolute;width:44px;height:44px;background:rgba(20,22,28,.85);border:1px solid rgba(255,255,255,.2);color:#f1f1ef;border-radius:8px;font-size:16px}
+  #pu{left:44px;top:0}#pd{left:44px;top:88px}#pl{left:0;top:44px}#pr{left:88px;top:44px}
+  #talk{position:fixed;right:16px;bottom:30px;z-index:6;background:#12212e;border:1px solid #2a4356;color:#e8eef2;border-radius:26px;padding:14px 22px;font:inherit;font-size:15px;opacity:.9;display:none}
+  #dlg{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(94vw,560px);z-index:8;display:none;
+       background:#0d1620;border:1px solid #22384a;border-radius:12px;padding:14px 16px}
+  #dlg .who{font-size:12px;color:#7fd1a3;margin-bottom:4px}
+  #dlg .line{font-size:15px;line-height:1.5;color:#f1f1ef;white-space:pre-wrap}
+  #dlg .x{position:absolute;right:10px;top:8px;background:none;border:none;color:#9fb3c4;font-size:18px}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+<div class="hint" id="hint">WASD / arrows to move · walk up to someone to talk</div>
+<div id="pad">
+  <button id="pu">▲</button><button id="pd">▼</button><button id="pl">◀</button><button id="pr">▶</button>
+</div>
+<button id="talk">Talk</button>
+<div id="dlg"><button class="x" id="dx">✕</button><div class="who" id="dwho"></div><div class="line" id="dline"></div></div>
+<script>
+(function(){
+  var TILE=16, COLS=12; // tilesheet columns
+  var img=new Image(); img.src="tiles.png";
+  var DEV=/[?&]dev=1/.test(location.search);
+
+  // ---- legend: char -> {t: tile index, solid} ----
+  var L={
+    '#':{t:57,s:1}, '.':{t:48,s:0}, '=':{t:77,s:1}, 'D':{t:45,s:0},
+    'b':{t:81,s:1}, 'B':{t:82,s:1}, 'T':{t:72,s:1}, 'c':{t:63,s:1}, ' ':{t:-1,s:1}
+  };
+  // ---- map (40 wide). cell block top-left, yard center, mess-hall tables right ----
+  var MAP=[
+   "########################################",
+   "#B..#b..#b..#b..#......................#",
+   "#...#...#...#...#....TT....TT....TT....#",
+   "#=D=#===#===#===#.....................D#",
+   "#..............#......................#",
+   "#.....P........#....TT....TT....TT....#",
+   "#..............#......................#",
+   "#..............#......................#",
+   "#######D########......................#",
+   "#....................................#",
+   "#...c...........c....................#",
+   "#....................................#",
+   "#...............c.......c............#",
+   "#....................................#",
+   "#....c................c..............#",
+   "#....................................#",
+   "#..........c.................c.......#",
+   "#....................................#",
+   "#....................................#",
+   "#....................................#",
+   "#....................................#",
+   "########################################"
+  ];
+  var W=Math.max.apply(null,MAP.map(function(r){return r.length;}));
+  MAP=MAP.map(function(r){ return r.length<W ? r.slice(0,-1)+Array(W-r.length+1).join(".")+r.slice(-1) : r; });
+  var H=MAP.length;
+  function at(cx,cy){ if(cy<0||cy>=H||cx<0||cx>=W) return ' '; return MAP[cy][cx]; }
+  function solidPx(px,py){ var cx=Math.floor(px/TILE), cy=Math.floor(py/TILE); var d=L[at(cx,cy)]; return !d||d.s; }
+
+  // ---- entities ----
+  function find(ch){ for(var y=0;y<H;y++){var x=MAP[y].indexOf(ch); if(x>=0) return {x:x,y:y};} return {x:2,y:2}; }
+  var pstart=find('P');
+  var player={ x:pstart.x*TILE+2, y:pstart.y*TILE+2, spr:85 };
+  // NPCs: tile 88 bunkmate(EN), 96/97 guards, 87 gang tough, 100/111/112 inmates. lang for later AI routing.
+  var npcs=[
+    {cx:1,cy:1,spr:88,name:"Bunkmate",lang:"en",line:"Hey. Keep your head down, cabrón. Don't stare at nobody."},
+    {cx:23,cy:5,spr:87,name:"El Jefe",lang:"es",line:"¿Y tú quién eres? No te conozco... cuidado con lo que dices."},
+    {cx:31,cy:2,spr:100,name:"Viejo",lang:"es",line:"La comida aquí es una porquería, joven. ¿Tienes cigarros?"},
+    {cx:20,cy:5,spr:111,name:"Preso",lang:"es",line:"Oye, gringo. ¿Sabes jugar dominó o no?"},
+    {cx:7,cy:9,spr:96,name:"Guardia",lang:"es",line:"¡Camina! No te detengas en el pasillo."},
+    {cx:14,cy:14,spr:112,name:"Flaco",lang:"es",line:"Tsss... ¿traes algo para mí? Aquí todo tiene precio."}
+  ];
+
+  // ---- render ----
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d");
+  var VW,VH,SCALE;
+  function resize(){ cv.width=innerWidth; cv.height=innerHeight;
+    SCALE=Math.max(2, Math.min(4, Math.floor(Math.min(innerWidth,innerHeight)/180)));
+    VW=cv.width; VH=cv.height; ctx.imageSmoothingEnabled=false; }
+  addEventListener("resize",resize); resize();
+  var cam={x:0,y:0};
+  function drawTile(t,dx,dy){ if(t<0) return; var sx=(t%COLS)*TILE, sy=Math.floor(t/COLS)*TILE;
+    ctx.drawImage(img,sx,sy,TILE,TILE,dx,dy,TILE*SCALE,TILE*SCALE); }
+  function render(){
+    ctx.fillStyle="#07080a"; ctx.fillRect(0,0,VW,VH);
+    var ox=Math.floor(cam.x-VW/2), oy=Math.floor(cam.y-VH/2);
+    var c0=Math.floor(ox/(TILE*SCALE))-1, r0=Math.floor(oy/(TILE*SCALE))-1;
+    var cn=Math.ceil(VW/(TILE*SCALE))+2, rn=Math.ceil(VH/(TILE*SCALE))+2;
+    for(var r=r0;r<r0+rn;r++) for(var c=c0;c<c0+cn;c++){
+      var d=L[at(c,r)]; if(!d) continue;
+      var dx=c*TILE*SCALE-ox, dy=r*TILE*SCALE-oy;
+      if(d.t!==48 && at(c,r)!==' ') drawTile(48,dx,dy); // floor under props
+      drawTile(d.t,dx,dy);
+    }
+    // npcs
+    npcs.forEach(function(n){ var dx=n.cx*TILE*SCALE-ox, dy=n.cy*TILE*SCALE-oy; drawTile(n.spr,dx,dy);
+      ctx.fillStyle="rgba(11,11,12,.75)"; ctx.font=(9*1)+"px monospace"; var w=ctx.measureText(n.name).width+6;
+      ctx.fillRect(dx+TILE*SCALE/2-w/2,dy-13,w,12); ctx.fillStyle=n.lang==="en"?"#7fd1a3":"#e6c07b";
+      ctx.textAlign="center"; ctx.fillText(n.name,dx+TILE*SCALE/2,dy-4); });
+    // player
+    if(!DEV){ drawTile(player.spr, Math.floor(player.x*SCALE-ox), Math.floor(player.y*SCALE-oy)); }
+  }
+
+  // ---- input ----
+  var keys={};
+  addEventListener("keydown",function(e){ keys[e.key.toLowerCase()]=1; if(e.key===" "||e.key==="e"){e.preventDefault(); tryTalk();} });
+  addEventListener("keyup",function(e){ keys[e.key.toLowerCase()]=0; });
+  function held(dir){ if(dir==="u")return keys["arrowup"]||keys["w"]||tp.u; if(dir==="d")return keys["arrowdown"]||keys["s"]||tp.d;
+    if(dir==="l")return keys["arrowleft"]||keys["a"]||tp.l; return keys["arrowright"]||keys["d"]||tp.r; }
+  var tp={u:0,d:0,l:0,r:0};
+  function bindPad(id,k){ var b=document.getElementById(id);
+    var on=function(e){e.preventDefault();tp[k]=1;}, off=function(e){e.preventDefault();tp[k]=0;};
+    b.addEventListener("touchstart",on);b.addEventListener("touchend",off);b.addEventListener("touchcancel",off);
+    b.addEventListener("mousedown",on);b.addEventListener("mouseup",off);b.addEventListener("mouseleave",off); }
+  bindPad("pu","u");bindPad("pd","d");bindPad("pl","l");bindPad("pr","r");
+  document.getElementById("talk").addEventListener("click",tryTalk);
+  document.getElementById("dx").addEventListener("click",function(){document.getElementById("dlg").style.display="none";});
+
+  // ---- talk (STUB — this is where the circle's Spanish-speaking model hooks in later) ----
+  function nearNpc(){ var best=null,bd=1e9; npcs.forEach(function(n){ var dx=(n.cx*TILE+8)-(player.x+8), dy=(n.cy*TILE+8)-(player.y+8);
+    var d=dx*dx+dy*dy; if(d<bd){bd=d;best=n;} }); return bd< (TILE*1.6)*(TILE*1.6) ? best : null; }
+  function tryTalk(){ var n=nearNpc(); if(!n) return; var d=document.getElementById("dlg");
+    document.getElementById("dwho").textContent=n.name+(n.lang==="es"?"  ·  español":"  ·  english");
+    document.getElementById("dline").textContent=n.line; d.style.display="block"; }
+
+  // ---- loop ----
+  function step(){
+    if(DEV){ // free camera to inspect the map
+      var s=6; if(held("u"))cam.y-=s; if(held("d"))cam.y+=s; if(held("l"))cam.x-=s; if(held("r"))cam.x+=s;
+    } else {
+      var sp=1.5, nx=player.x, ny=player.y;
+      if(held("u"))ny-=sp; if(held("d"))ny+=sp; if(held("l"))nx-=sp; if(held("r"))nx+=sp;
+      // collision (sample player box corners, 12px)
+      var B=12;
+      if(!solidPx(nx,player.y)&&!solidPx(nx+B,player.y)&&!solidPx(nx,player.y+B)&&!solidPx(nx+B,player.y+B)) player.x=nx;
+      if(!solidPx(player.x,ny)&&!solidPx(player.x+B,ny)&&!solidPx(player.x,ny+B)&&!solidPx(player.x+B,ny+B)) player.y=ny;
+      cam.x=(player.x+8)*SCALE; cam.y=(player.y+8)*SCALE;
+      document.getElementById("talk").style.display=nearNpc()?"block":"none";
+    }
+    render(); requestAnimationFrame(step);
+  }
+  if(DEV){ cam.x=W*TILE*SCALE/2; cam.y=H*TILE*SCALE/2; document.getElementById("hint").textContent="DEV — arrows/WASD to pan the map"; document.getElementById("pad").style.opacity=.4; }
+  img.onload=function(){ resize(); step(); };
+  if(img.complete) img.onload();
+})();
+</script>
+</body>
+</html>
