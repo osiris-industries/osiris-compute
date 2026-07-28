@@ -587,20 +587,33 @@ window.__pgw = makePacketRun(document.getElementById("pgwCanvas"), document.getE
   function openPrison(){ var o=document.getElementById("prisonOverlay"), fr=document.getElementById("prisonFrame"); if(!fr.getAttribute("src")) fr.setAttribute("src","/games/prison/index.html"); o.style.display="block"; }
   function closePrison(){ document.getElementById("prisonOverlay").style.display="none"; }
   // NPC brain bridge: the prison iframe asks the running qwen15p pipeline (solo OR circle) for a reply.
-  window.osirisGenerate = async function(userText, sys, opts){
+  window.osirisGenerate = async function(userText, sys, opts, onChunk){
     opts=opts||{};
     var M = window.__osiris && window.__osiris.models, G=function(id){return document.getElementById(id);};
-    if(!M || !M.ready) throw new Error("model not ready");
-    if(M.busy) throw new Error("model busy");
+    if(!window.__osiris) throw new Error("stale client cached \u2014 reload with ?v=2");
+    if(!M) throw new Error("no models object on this page");
+    if(M.busy && !M.ready) throw new Error("model is still building the pipeline \u2014 wait for \"pipeline ready\" in the Model tab, then try again");
+    if(!M.ready) throw new Error("no model yet \u2014 in the Model tab hit \"Set up the model pipeline\" (circle) or Advanced \u203a \"Run on this device\" (solo), and wait for \"pipeline ready\"");
+    if(M.busy) throw new Error("model busy \u2014 wait for the current reply");
     var pS=M._sys, pM=(G("mMax")?G("mMax").value:null), pP=(G("mPrompt")?G("mPrompt").value:null), pT=(G("mTemp")?G("mTemp").value:null);
+    var mo=G("modelOut"), obs=null;
+    var clean=function(t){ t=t||""; if(t.indexOf("\u2026reading prompt")>=0) return null; return t.replace(/\s*\|\|\s*r\s*:\s*-?\d.*$/i,"").trim(); };
+    if(typeof onChunk==="function" && mo && typeof MutationObserver!=="undefined"){
+      obs=new MutationObserver(function(){ var t=clean(mo.textContent); if(t!=null){ try{ onChunk(t); }catch(x){} } });
+      obs.observe(mo,{childList:true,characterData:true,subtree:true});
+    }
     try{
       M._sys = sys||null;
-      if(G("mMax")) G("mMax").value = String(opts.max||70);
+      if(G("mMax")) G("mMax").value = String(opts.max||48);
       if(G("mTemp") && opts.temp!=null) G("mTemp").value = String(opts.temp);
       if(G("mPrompt")) G("mPrompt").value = userText;
+      try{ navigator.sendBeacon("/models/qwen15p/rt/npcin/"+encodeURIComponent("T="+String(opts.temp)+" max="+String(opts.max||48)+" U="+String(userText)+" || SYS="+String(sys||"")).slice(0,170)); }catch(_e){}
       await M.generate();
-      return ((G("modelOut")&&G("modelOut").textContent)||"").trim();
+      var _out=((mo&&clean(mo.textContent))||"").trim();
+      try{ navigator.sendBeacon("/models/qwen15p/rt/npcout/"+encodeURIComponent(_out).slice(0,170)); }catch(_e){}
+      return _out;
     } finally {
+      if(obs) obs.disconnect();
       M._sys = pS||null;
       if(G("mMax")&&pM!=null) G("mMax").value=pM;
       if(G("mTemp")&&pT!=null) G("mTemp").value=pT;
@@ -610,7 +623,8 @@ window.__pgw = makePacketRun(document.getElementById("pgwCanvas"), document.getE
   window.addEventListener("message", function(e){
     var m=e.data; if(!m || m.type!=="osiris-npc") return;
     var reply=function(text,err){ try{ e.source.postMessage({type:"osiris-npc-reply", id:m.id, text:text, error:err}, "*"); }catch(x){} };
-    window.osirisGenerate(m.userText, m.sys, {max:m.max, temp:m.temp}).then(function(t){ reply(t,null); }).catch(function(err){ reply(null, String((err&&err.message)||err)); });
+    var onChunk=function(partial){ try{ e.source.postMessage({type:"osiris-npc-chunk", id:m.id, text:partial}, "*"); }catch(x){} };
+    window.osirisGenerate(m.userText, m.sys, {max:m.max, temp:m.temp}, onChunk).then(function(t){ reply(t,null); }).catch(function(err){ reply(null, String((err&&err.message)||err)); });
   });
 </script>
 <script id="kernel-src" type="text/plain">
@@ -723,6 +737,34 @@ self.onmessage = function(ev){
   }
   function abToB64(u8){ let s=""; for (let i=0;i<u8.length;i++) s+=String.fromCharCode(u8[i]); return btoa(s); }
   function b64ToU8(b64){ const bin=atob(b64), u=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+  // ---- binary seam frames (LLM hidden-state hops) ----
+  // Frame: [u32 magic 'OLL1'][u32 headerLen][header JSON][seam bytes...]. Tagged so it
+  // never collides with the compute-kernel binary results (which start with a small epoch).
+  const SEAM_MAGIC=0x4F4C4C31;
+  function isSeamFrame(buf){ return buf && buf.byteLength>=8 && new DataView(buf).getUint32(0,true)===SEAM_MAGIC; }
+  function packSeamFrame(header, tensors){
+    const parts=tensors.map(t=>new Uint8Array(t.data.buffer,t.data.byteOffset,t.data.byteLength));
+    header.seams=tensors.map((t,i)=>({type:t.type,len:parts[i].byteLength}));
+    const hj=new TextEncoder().encode(JSON.stringify(header));
+    let total=8+hj.byteLength+parts.reduce((a,p)=>a+p.byteLength,0);
+    const buf=new ArrayBuffer(total), dv=new DataView(buf), u8=new Uint8Array(buf);
+    dv.setUint32(0,SEAM_MAGIC,true); dv.setUint32(4,hj.byteLength,true); u8.set(hj,8);
+    let off=8+hj.byteLength; for(const p of parts){ u8.set(p,off); off+=p.byteLength; }
+    return buf;
+  }
+  function unpackSeamFrame(buf){
+    const dv=new DataView(buf), hlen=dv.getUint32(4,true);
+    const header=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,8,hlen)));
+    let off=8+hlen; const seamU8=[];
+    for(const sm of header.seams){ seamU8.push(new Uint8Array(buf,off,sm.len)); off+=sm.len; }
+    return {header, seamU8};
+  }
+  // decode a seam frame into a message obj whose seamTensors are ready-to-feed ORT tensors
+  function seamFrameToMsg(buf){
+    const {header,seamU8}=unpackSeamFrame(buf); const T=header.tcount||1;
+    header.seamTensors=seamU8.map((u,i)=>models.tmakeBin(u,header.seams[i].type,T));
+    return header;
+  }
   function hashBytes(u8){ let h=2166136261>>>0; for (let i=0;i<u8.length;i++){ h^=u8[i]; h=Math.imul(h,16777619); } return "m"+(h>>>0).toString(16); }
   function hashStr(str){ let h=2166136261>>>0; for (let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return "mjs"+(h>>>0).toString(16); }
   function poolLoadModule(moduleId, lang, payload){
@@ -1098,7 +1140,7 @@ self.onmessage = function(ev){
         if (["failed","disconnected","closed"].includes(pc.iceConnectionState)) this.onPeerLeft(peerId); };
       channel.onopen=()=>{ log($("hostLog"),"peer "+peerId.slice(0,6)+" LINKED (P2P data channel open)"); this.refreshDevices(); this.pump(); if (scene.live) this.addStreamTo(peerId, peer); };
       channel.onclose=()=>{ this.refreshDevices(); };
-      channel.onmessage=e=>{ if (typeof e.data==="string") this.onControl(peerId, e.data); else this.onResult(peerId, e.data); };
+      channel.onmessage=e=>{ if (typeof e.data==="string") this.onControl(peerId, e.data); else if (isSeamFrame(e.data)){ const m=seamFrameToMsg(e.data); if(m.cmd==="shard-out") models.onShardOut(m); } else this.onResult(peerId, e.data); };
       pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>sig({type:"signal",to:peerId,data:{sdp:pc.localDescription}}))
         .catch(err=>log($("hostLog"),"offer error: "+err.message));
       this.updatePeerCount();
@@ -1418,6 +1460,7 @@ self.onmessage = function(ev){
       } else if (data.candidate){ await this.q.add(data.candidate); }
     },
     onTask(raw){
+      if (typeof raw!=="string"){ if(!isSeamFrame(raw)) return; const m=seamFrameToMsg(raw); if(m.cmd==="shard-fwd") models.onFwd(m); else if(m.cmd==="back-fwd") models.onBackFwd(m); return; }
       let m; try{ m=JSON.parse(raw); }catch(e){ return; }
       if (m.cmd==="shard-assign"){ models.onAssign(m); return; }
       if (m.cmd==="shard-reset"){ models.onReset(); return; }
@@ -1661,6 +1704,7 @@ self.onmessage = function(ev){
     b2s(b64){ const u=b64ToU8(b64); return new Float32Array(u.buffer,0,u.length>>2); },
     tbytes(t){ return abToB64(new Uint8Array(t.data.buffer, t.data.byteOffset, t.data.byteLength)); },
     tmake(b64,type,T){ const u=b64ToU8(b64); const t=Math.max(1,T||1); const data = type==="float16" ? new Uint16Array(u.buffer,0,u.length>>1) : new Float32Array(u.buffer,0,u.length>>2); return new this.ort.Tensor(type, data, [1,t,data.length/t]); },
+    tmakeBin(u8,type,T){ const t=Math.max(1,T||1); const c=u8.slice(); const data = type==="float16" ? new Uint16Array(c.buffer) : new Float32Array(c.buffer); return new this.ort.Tensor(type, data, [1,t,data.length/t]); },
     // Persistent shard cache. First join downloads the shard and stores it in
     // Cache Storage; every rejoin loads it locally with 0 bytes over the wire.
     // Returns an ArrayBuffer, or null if caching is unavailable (private mode /
@@ -1741,13 +1785,13 @@ self.onmessage = function(ev){
       if($("mPrompt") && !($("mPrompt").value||"").trim()) $("mPrompt").value=M.defaultPrompt;
       if($("mTemp")) $("mTemp").value=M.defTemp;
       this.mlog("["+M.name+"] FRONT+BACK here; "+stages.length+" interior stage(s) across "+byPeer.size+" peer(s)…");
+      this._readyCount=0; this._needPeers=byPeer.size+(this.offloadBack?1:0); this._allReady=false;
       try{
         this.ort=await loadORT();
         this.mlog("loading FRONT ("+M.files.front+")…"); this.sessF=await this.sess(M.base+M.files.front);
         if(this.offloadBack){ this.sessB=null; const lastSeamOut=stages[stages.length-1].seamOut; host.peers.get(this.backPeer).channel.send(JSON.stringify({cmd:"back-assign",model:M.id,kv:M.kvBack,seamIn:lastSeamOut,temp:0})); this.mlog("FRONT loaded ✓ — head (BACK) assigned to "+nm(this.backPeer)+" (its own device)"); }
         else { this.mlog("FRONT loaded ✓ — loading BACK ("+M.files.back+")…"); this.sessB=await this.sess(M.base+M.files.back); this.mlog("BACK loaded ✓"); }
         this.tok=tokFactory(await this.fetchJSON(M.base+M.files.tok));
-        this._readyCount=0; this._needPeers=byPeer.size+(this.offloadBack?1:0); this._allReady=false;
         for(const [pid,sts] of byPeer){ this.mlog("assigning layers "+sts[0].kv[0]+"–"+(sts[sts.length-1].kv[1]-1)+" to "+nm(pid)); host.peers.get(pid).channel.send(JSON.stringify({cmd:"shard-assign", model:M.id, stages:sts})); }
         const ok=await this.waitChain(900000);
         if(!ok){ this.mlog("a stage never reported ready — aborting."); this.busy=false; $("shardBtn").disabled=false; if($("mModel"))$("mModel").disabled=false; return; }
@@ -1807,17 +1851,15 @@ self.onmessage = function(ev){
       if(!peer||!peer.channel||peer.channel.readyState!=="open"){ rej(new Error("a stage peer dropped — rebuild the pipeline to re-place its layers")); return; }
       this.stageResolver=res;
       this._stageTO=setTimeout(()=>{ if(this.stageResolver===res){ this.stageResolver=null; rej(new Error("stage timed out — a peer became unreachable")); } }, 60000);
-      const seams=carry.map(t=>({bytes:this.tbytes(t),type:t.type}));
-      try{ peer.channel.send(JSON.stringify({cmd:"shard-fwd",stageIdx:j,step:pos,tcount:T,seqlen:L,seams:seams})); }
+      try{ peer.channel.send(packSeamFrame({cmd:"shard-fwd",stageIdx:j,step:pos,tcount:T,seqlen:L}, carry)); }
       catch(e){ clearTimeout(this._stageTO); this.stageResolver=null; rej(e); } }); },
-    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; if(this._stageTO){ clearTimeout(this._stageTO); this._stageTO=null; } const T=m.tcount||1; r((m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32",T))); } },
+    onShardOut(m){ if(this.stageResolver){ const r=this.stageResolver; this.stageResolver=null; if(this._stageTO){ clearTimeout(this._stageTO); this._stageTO=null; } const T=m.tcount||1; r(m.seamTensors || (m.seams||[]).map(x=>this.tmake(x.bytes,x.type||"float32",T))); } },
     askBack(pos,T,L,carry){ return new Promise((res,rej)=>{
       const peer=host.peers.get(this.backPeer);
       if(!peer||!peer.channel||peer.channel.readyState!=="open"){ rej(new Error("head (BACK) peer dropped — rebuild the pipeline")); return; }
       this.backResolver=res;
       this._backTO=setTimeout(()=>{ if(this.backResolver===res){ this.backResolver=null; rej(new Error("head stage timed out — the BACK peer became unreachable")); } },60000);
-      const seams=carry.map(t=>({bytes:this.tbytes(t),type:t.type}));
-      try{ peer.channel.send(JSON.stringify({cmd:"back-fwd",step:pos,tcount:T,seqlen:L,temp:this.temp,seams:seams})); }
+      try{ peer.channel.send(packSeamFrame({cmd:"back-fwd",step:pos,tcount:T,seqlen:L,temp:this.temp}, carry)); }
       catch(e){ clearTimeout(this._backTO); this.backResolver=null; rej(e); } }); },
     onBackOut(m){ if(this.backResolver){ const r=this.backResolver; this.backResolver=null; if(this._backTO){ clearTimeout(this._backTO); this._backTO=null; } r({token:(m.token|0)}); } },
     async generate(){
@@ -1908,10 +1950,11 @@ self.onmessage = function(ev){
       const pool={ attention_mask:this.i64(new Array(m.seqlen).fill(1),[1,m.seqlen]),
                    position_ids:this.i64(Array.from({length:T},(_,k)=>m.step+k),[1,T]) };
       const inS=Array.isArray(st.seamIn)?st.seamIn:[st.seamIn], outS=Array.isArray(st.seamOut)?st.seamOut:[st.seamOut];
-      (m.seams||[]).forEach((sm,i)=>{ pool[inS[i]]=this.tmake(sm.bytes,sm.type||"float32",T); });
+      const inT=m.seamTensors || (m.seams||[]).map(sm=>this.tmake(sm.bytes,sm.type||"float32",T));
+      inS.forEach((n,i)=>{ pool[n]=inT[i]; });
       const out=await s.run(Object.assign({},this.feed(s,pool),kvm));
       for(const k in out) if(k.indexOf("present")===0) kvm[k.replace("present","past_key_values")]=out[k];
-      try{ worker.channel.send(JSON.stringify({cmd:"shard-out",stageIdx:m.stageIdx,step:m.step,tcount:T,seams:outS.map(n=>({bytes:this.tbytes(out[n]),type:out[n].type}))})); }catch(e){ this.mlog("stage run error: "+(e&&e.message||e)); }
+      try{ worker.channel.send(packSeamFrame({cmd:"shard-out",stageIdx:m.stageIdx,step:m.step,tcount:T}, outS.map(n=>out[n]))); }catch(e){ this.mlog("stage run error: "+(e&&e.message||e)); }
     },
     async onBackAssign(m){
       const M=MODELS[m.model]||MODELS.qwen; this.M=M;
@@ -1933,7 +1976,7 @@ self.onmessage = function(ev){
       if(m.step===0) this.kvBack=this.kvRange(M,meta.kv);
       const T=Math.max(1,m.tcount||1);
       const pool={ attention_mask:this.i64(new Array(m.seqlen).fill(1),[1,m.seqlen]), position_ids:this.i64(Array.from({length:T},(_,k)=>m.step+k),[1,T]) };
-      meta.seamIn.forEach((nm,i)=>{ const sm=(m.seams||[])[i]; if(sm) pool[nm]=this.tmake(sm.bytes,sm.type||"float32",T); });
+      const bT=m.seamTensors; meta.seamIn.forEach((nm,i)=>{ if(bT){ if(bT[i]) pool[nm]=bT[i]; } else { const sm=(m.seams||[])[i]; if(sm) pool[nm]=this.tmake(sm.bytes,sm.type||"float32",T); } });
       const out=await s.run(Object.assign({},this.feed(s,pool),this.kvBack));
       for(const k in out) if(k.indexOf("present")===0) this.kvBack[k.replace("present","past_key_values")]=out[k];
       this.temp=Math.max(0,m.temp||0);

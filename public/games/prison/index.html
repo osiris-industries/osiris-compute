@@ -96,22 +96,22 @@
   var npcs=[
     {cx:1,cy:1,spr:88,name:"Miguel (bunkmate)",lang:"en",respect:0,
      line:"Hey. Keep your head down, cabrón. Don't stare at nobody.",
-     sys:"You are Miguel, cellmate to a newcomer wrongly jailed in a Mexican prison called La Sombra. You are bilingual and speak to him in ENGLISH. Street-smart, wary, dryly funny, quietly protective of the new guy. Reply in 1-2 SHORT sentences, in character, no narration. At the very end append a hidden tag ||r:N where N is an integer -2..2 = how your respect for him changed this turn. Never break character."},
+     sys:"You are Miguel, an English-speaking cellmate to a newcomer wrongly jailed in a Mexican prison. Street-smart, wary, dryly funny, quietly protective of the new guy. Answer in ONE short sentence, in character. Dialogue only, no narration, no stage directions."},
     {cx:23,cy:5,spr:87,name:"El Jefe",lang:"es",respect:0,
      line:"¿Y tú quién eres? No te conozco... cuidado con lo que dices.",
-     sys:"Eres El Jefe, líder de un grupo dentro de una prisión mexicana llamada La Sombra. Hablas SOLO español, nunca inglés. Orgulloso, territorial y peligroso; pones a prueba a los nuevos y no toleras faltas de respeto. Responde en 1-2 frases CORTAS, en personaje, sin narración. Al final añade una etiqueta oculta ||r:N donde N es un entero -2..2 = cuánto cambió tu respeto por él. Nunca rompas el personaje."},
+     sys:"Eres El Jefe, el líder temido de una prisión mexicana. Orgulloso, territorial, peligroso; pruebas a los nuevos. Contesta SOLO en español, UNA frase corta, en personaje. Solo diálogo, sin narración."},
     {cx:31,cy:2,spr:100,name:"El Viejo",lang:"es",respect:0,
      line:"La comida aquí es una porquería, joven. ¿Tienes cigarros?",
-     sys:"Eres 'El Viejo', un preso anciano en una prisión mexicana. Hablas SOLO español. Cansado, filosófico, inofensivo; siempre quieres cigarros. 1-2 frases cortas, en personaje. Añade al final ||r:N (-2..2). No rompas el personaje."},
+     sys:"Eres El Viejo, un preso anciano y filosófico en una prisión mexicana; siempre pides cigarros. Contesta SOLO en español, UNA frase corta, en personaje. Solo diálogo."},
     {cx:20,cy:5,spr:111,name:"Chuy",lang:"es",respect:0,
      line:"Oye, gringo. ¿Sabes jugar dominó o no?",
-     sys:"Eres 'Chuy', un preso común en una prisión mexicana. Hablas SOLO español. Casual, chismoso; quieres jugar dominó y hacer amigos o burlarte. 1-2 frases cortas, en personaje. Añade ||r:N (-2..2). No rompas el personaje."},
+     sys:"Eres Chuy, un preso chismoso y casual que quiere jugar dominó en una prisión mexicana. Contesta SOLO en español, UNA frase corta, en personaje. Solo diálogo."},
     {cx:7,cy:9,spr:96,name:"Guardia",lang:"es",respect:0,
      line:"¡Camina! No te detengas en el pasillo.",
-     sys:"Eres un guardia de una prisión mexicana. Hablas SOLO español. Autoritario, seco, sin paciencia; das órdenes. 1-2 frases cortas, en personaje. Añade ||r:N (-2..2). No rompas el personaje."},
+     sys:"Eres un guardia autoritario y seco de una prisión mexicana; das órdenes. Contesta SOLO en español, UNA frase corta, en personaje. Solo diálogo."},
     {cx:14,cy:14,spr:112,name:"Flaco",lang:"es",respect:0,
      line:"Tsss... ¿traes algo para mí? Aquí todo tiene precio.",
-     sys:"Eres 'Flaco', un preso que trafica de todo dentro de la prisión. Hablas SOLO español. Nervioso, calculador; todo tiene precio. 1-2 frases cortas, en personaje. Añade ||r:N (-2..2). No rompas el personaje."}
+     sys:"Eres Flaco, un preso nervioso que trafica de todo; para ti todo tiene precio. Contesta SOLO en español, UNA frase corta, en personaje. Solo diálogo."}
   ];
 
   // ---- render ----
@@ -172,20 +172,22 @@
     document.getElementById("dwho").textContent=n.name+"  ·  "+(n.lang==="en"?"english":"español");
     document.getElementById("dhist").innerHTML=""; addMsg("npc",n.line); setMeter(n);
     document.getElementById("dlg").style.display="flex"; setTimeout(function(){ var i=document.getElementById("din"); if(i) i.focus(); },60); }
-  function askBrain(npc,userText){ return new Promise(function(resolve){
+  function askBrain(npc,userText,onChunk){ return new Promise(function(resolve){
     var id="npc_"+Math.random().toString(36).slice(2), done=false;
     function fin(r){ if(done)return; done=true; clearTimeout(to); window.removeEventListener("message",onMsg); resolve(r); }
-    function onMsg(e){ var m=e.data; if(!m||m.type!=="osiris-npc-reply"||m.id!==id) return; fin(m.error?{err:m.error}:{text:m.text||""}); }
+    function onMsg(e){ var m=e.data; if(!m||m.id!==id) return;
+      if(m.type==="osiris-npc-chunk"){ if(onChunk&&m.text) onChunk(m.text); return; }
+      if(m.type==="osiris-npc-reply"){ fin(m.error?{err:m.error}:{text:m.text||""}); } }
     var to=setTimeout(function(){ fin({err:"timeout"}); },120000);
     window.addEventListener("message",onMsg);
-    try{ window.parent.postMessage({type:"osiris-npc",id:id,sys:npc.sys,userText:userText,max:70,temp:0.7},"*"); }catch(x){ fin({err:"no host"}); } }); }
+    try{ window.parent.postMessage({type:"osiris-npc",id:id,sys:npc.sys,userText:userText,max:48,temp:0.5},"*"); }catch(x){ fin({err:"no host"}); } }); }
   function sendReply(){ if(CONV.busy||!CONV.npc) return; var inp=document.getElementById("din"); var text=(inp.value||"").trim(); if(!text) return;
-    inp.value=""; addMsg("you",text); CONV.busy=true; document.getElementById("dsend").disabled=true; var typing=addMsg("sys","\u2026 (the circle is thinking)");
-    askBrain(CONV.npc,text).then(function(r){ typing.remove();
-      if(r.err){ addMsg("sys", (r.err==="model not ready"||r.err==="no host") ? "(set up the model in the Model tab first \u2014 NPCs think on the circle's brain)" : "(no answer \u2014 "+r.err+")"); }
-      else { var p=parseMood(r.text); addMsg("npc", p.text||"\u2026"); CONV.npc.respect=Math.max(-6,Math.min(6,CONV.npc.respect+p.mood)); setMeter(CONV.npc);
-             if(CONV.npc.respect<=-5) addMsg("sys","\u26a0 te has ganado un enemigo\u2026"); }
-      CONV.busy=false; document.getElementById("dsend").disabled=false; }); }
+    inp.value=""; addMsg("you",text); CONV.busy=true; document.getElementById("dsend").disabled=true;
+    var hist=document.getElementById("dhist"), bubble=addMsg("npc","\u2026");
+    askBrain(CONV.npc,text,function(partial){ bubble.innerHTML=esc(partial||"\u2026"); hist.scrollTop=hist.scrollHeight; }).then(function(r){
+      if(r.err){ bubble.className="m sys"; bubble.innerHTML=esc("\u26a0 "+r.err); }
+      else { var p=parseMood(r.text); bubble.innerHTML=esc(p.text||"\u2026"); }
+      hist.scrollTop=hist.scrollHeight; CONV.busy=false; document.getElementById("dsend").disabled=false; }); }
 
   // ---- loop ----
   function step(){
